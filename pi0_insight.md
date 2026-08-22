@@ -299,9 +299,9 @@ _output_transform
 LIBERO actions
 ```
 
-### Phase 1.5
+## Phase 1.1
 
-#### \_input\_transform
+### \_input\_transform
 
 首先来看 `_input_transform` 到底对输入数据做了什么变换，以及为什么要接收这种构造的数据，这里开始追踪调用流：
 
@@ -344,7 +344,7 @@ class Policy(BasePolicy):
         
 ```
 
-所以需要去分析创建时的参数调用，回到 `scripts/serve_policy.py`，这里调用方是 `create_trained_policy` ，还需要看懂参数是如何传递的，因为我们研究的是 `pi0 + libero` 数据集，所以 `args.policy.config` 理论上应该是 `pi0_libero`，但是这里并没有提供，所以就按照 `pi05_libero` 来看，很明显获取的就是一个代表配置的字符串：
+所以需要去分析创建时的参数调用，回到 `scripts/serve_policy.py`，这里调用方是 `create_trained_policy` ，还需要看懂参数是如何传递的，当前官方默认 LIBERO deployment 是 pi0.5；如果我们的实验对象明确选择经典 pi0，那么实验时必须显式指定 pi0 对应 config/checkpoint，不能走默认 LIBERO policy。这里很明显获取的就是一个代表配置的字符串：
 
 ```python
 
@@ -690,7 +690,7 @@ RepackTransform -> InjectDefaultPrompt -> libero_policy.LiberoInputs -> Normaliz
 model_transforms: InjectDefaultPrompt -> ResizeImages (224 * 224) -> TokenizePrompt(PaligemmaTokenizer) -> PadStatesAndActions
 ```
 
-#### Observation.from_dict
+### Observation.from_dict
 
 ```python
 @at.typecheck  
@@ -789,7 +789,7 @@ float32 [-1,1]
 
 ```
 
-#### \_sample\_action
+### \_sample\_action
 
 这里需要看模型真正实现的该方法，之前在 `TrainConfig` 时看到这里真正调用的模型配置 `Pi0Config`:
 
@@ -1046,7 +1046,7 @@ def embed_prefix(
 ```python
 [base image tokens]
 [left wrist image tokens]
-[right wrist image tokens] # libero 数据集的话，这张图片对应的是 0 零填充的数据，编码后也会较为特殊，没有实际意义
+[right wrist image tokens] # libero 数据集的话，这张图片对应的是 0 零填充的数据，仍然有视觉 token，但是 mask 会将其隐去
 [language tokens]
 ```
 
@@ -1068,11 +1068,839 @@ def embed_prefix(
 > [!NOTE]- `Observation.from_dict()` 对 image 又做了什么？
 > 标准化图像数据，将 uint8 变成 float32[-1, 1]，并转成 Observation
 
-> [!NOTE]- `Observation.from_dict()` 对 image 又做了什么？
-> 标准化图像数据，将 uint8 变成 float32[-1, 1]，并转成 Observation
-
 > [!NOTE]- 第一份真正的 π0 visual token 在哪一行产生？
 > image_tokens, _ = self.PaliGemma.img(obs.images[name], train=False)  
 
 > [!NOTE]- `embed_prefix()` 中 image、language、state 谁进入 prefix，谁没有进入？
 > image + language 进入， state 没有进入
+
+## Phase 2
+
+接下来看 `siglip` 如何处理图像，调用点如下：
+
+```python
+# src/openpi/models/pi0.py
+
+img = nnx_bridge.ToNNX(  
+    _siglip.Module(  
+        num_classes=paligemma_config.width,  
+        variant="So400m/14",  
+        pool_type="none",  
+        scan=True,  
+        dtype_mm=config.dtype,  
+    )  # 这里调用的是构造方法 __init__ , img(arg) 才是调用神经网络的 __call__ 方法
+)
+```
+
+根据参数 `So400m/14` 可知 `num_classes` 对应值为 1152, `patch_size=14 * 14`:
+
+```python
+# src/openpi/models/siglip.py
+
+def Module(num_classes=None, *, variant=None, **kw):  # pylint: disable=invalid-name  # noqa: N802  
+    """Factory function, because linen really don't like what I'm doing!"""  
+    return _Module(num_classes, **{**decode_variant(variant), **kw})
+
+def decode_variant(variant):  
+    """Converts a string like "B" or "B/32" into a params dict."""  
+    if variant is None:  
+        return {}  
+  
+    v, patch = variant, {}  
+    if "/" in variant:  
+        v, patch = variant.split("/")  
+        patch = {"patch_size": (int(patch), int(patch))}  
+  
+    return {  
+        # pylint:disable=line-too-long  
+        # Reference: Table 2 of https://arxiv.org/abs/2106.04560.        
+        "width": {  
+            ...
+            "So400m": 1152,  
+            ... 
+        }[v],
+        "depth": {  
+		    ... 
+		    "So400m": 27,  
+		    ...  
+		}[v],  
+		"mlp_dim": {  
+		    ...
+		    "So400m": 4304,  
+		    ... 
+		}[v],  
+		"num_heads": {  
+		    ...  
+		    "So400m": 16,  
+		    ...  
+		}[v],
+		...
+		**patch,
+	}
+```
+
+```
+SigLIP width           = 1152
+SigLIP depth           = 27
+SigLIP patch size      = 14
+Gemma-2B width         = 2048
+num_classes            = 2048
+```
+
+真正初始化的类如下：
+
+```python
+# src/openpi/models/siglip.py
+
+# 这里继承的是 import flax.linen as nn 中的模块，这里是数据类，所以构造方法会自行实现，并不需要显示写出
+class _Module(nn.Module):  
+    """ViT model."""  
+  
+    num_classes: int | None = None  
+    patch_size: Sequence[int] = (16, 16)  
+    width: int = 768  
+    depth: int = 12  
+    mlp_dim: int | None = None  # Defaults to 4x input dim  
+    num_heads: int = 12  
+    posemb: str = "learn"  # Can also be "sincos2d"  
+    rep_size: int | bool = False  
+    dropout: float = 0.0  
+    pool_type: str = "gap"  # Can also be "map" or "tok"  
+    head_zeroinit: bool = True  
+    scan: bool = False  
+    # or "dots_with_no_batch_dims_saveable" for more speed (memory costly)  
+    remat_policy: str = "nothing_saveable"  
+    dtype_mm: str = "float32"  
+  
+    @nn.compact  
+    def __call__(self, image, *, train=False):  
+        out = {}  
+  
+        # Kevin edit: do patch extraction and posemb in float32,  
+        # because I feel like it's a bit safer.        
+        image = jnp.asarray(image, jnp.float32)  
+  
+        # Patch extraction  
+        x = out["stem"] = nn.Conv(  
+            self.width,         # 1152
+            self.patch_size,    # 14 * 14 = 196
+            strides=self.patch_size,  # 14
+            padding="VALID",  
+            name="embedding",  
+            dtype=jnp.float32,  
+        )(image)  # 输入的 image 为 [B, 224, 224, 3]
+  
+        n, h, w, c = x.shape  
+        x = jnp.reshape(x, [n, h * w, c])  
+  
+        # Add posemb before adding extra token.  
+        x = out["with_posemb"] = x + get_posemb(self, self.posemb, (h, w), c, "pos_embedding", jnp.float32)  
+  
+        if self.pool_type == "tok":  
+            cls = self.param("cls", nn.initializers.zeros, (1, 1, c), x.dtype)  
+            x = jnp.concatenate([jnp.tile(cls, [n, 1, 1]), x], axis=1)  
+  
+        n, _, c = x.shape  # n,l,d  
+        x = nn.Dropout(rate=self.dropout)(x, not train)  
+  
+        # Kevin edit: now cast back to dtype_mm (potentially half precision)  
+        x = x.astype(self.dtype_mm)  
+  
+        x, out["encoder"] = Encoder(  
+            depth=self.depth,  
+            mlp_dim=self.mlp_dim,  
+            num_heads=self.num_heads,  
+            dropout=self.dropout,  
+            scan=self.scan,  
+            remat_policy=self.remat_policy,  
+            dtype_mm=self.dtype_mm,  
+            name="Transformer",  
+        )(x, deterministic=not train)  
+        encoded = out["encoded"] = x  
+  
+        if self.pool_type == "map":  
+            x = out["head_input"] = MAPHead(  
+                num_heads=self.num_heads,  
+                mlp_dim=self.mlp_dim,  
+                dtype=self.dtype_mm,  
+            )(x)  
+        elif self.pool_type == "gap":  
+            x = out["head_input"] = jnp.mean(x, axis=1)  
+        elif self.pool_type == "0":  
+            x = out["head_input"] = x[:, 0]  
+        elif self.pool_type == "tok":  
+            x = out["head_input"] = x[:, 0]  
+            encoded = encoded[:, 1:]  
+        elif self.pool_type == "none":  
+            pass  
+        else:  
+            raise ValueError(f"Unknown pool type: '{self.pool_type}'")  
+  
+        x_2d = jnp.reshape(encoded, [n, h, w, -1])  
+  
+        if self.rep_size:  
+            rep_size = self.width if self.rep_size is True else self.rep_size  
+            hid = nn.Dense(rep_size, dtype=self.dtype_mm, name="pre_logits")  
+            # NOTE: In the past we did not include tanh in pre_logits.  
+            # For few-shot, it should not matter much, as it whitens anyways.            
+            x_2d = nn.tanh(hid(x_2d))  
+            x = nn.tanh(hid(x))  
+  
+        out["pre_logits_2d"] = x_2d  
+        out["pre_logits"] = x  
+  
+        if self.num_classes:  
+            kw = {"kernel_init": nn.initializers.zeros} if self.head_zeroinit else {}  
+            head = nn.Dense(self.num_classes, dtype=self.dtype_mm, name="head", **kw)  
+            x_2d = out["logits_2d"] = head(x_2d)  
+            x = out["logits"] = head(x)  
+  
+        return x, out  
+  
+  
+
+```
+
+上面经过传参初始化后：
+
+```python
+self.num_classes = paligemma_config.width
+
+self.patch_size = (14, 14)
+self.width = 1152
+self.depth = 27
+self.mlp_dim = 4304
+self.num_heads = 16
+
+self.posemb = "learn"
+self.rep_size = False
+self.dropout = 0.0
+
+self.pool_type = "none"
+
+self.head_zeroinit = True
+
+self.scan = True
+
+self.remat_policy = "nothing_saveable"
+
+self.dtype_mm = config.dtype
+```
+
+#### nn.Conv
+
+所以说真正创建卷积层时的参数如下：
+
+```python
+nn.Conv(
+    features=1152, # 输出 feature 数 / 输出 channel 数
+    kernel_size=(14,14),
+    strides=(14,14),
+    padding="VALID",
+    name="embedding",
+    dtype=jnp.float32,
+)(image)
+```
+
+```
+224 × 224 image
+
+┌────┬────┬────┬────┐
+│14² │14² │14² │ ...│
+├────┼────┼────┼────┤
+│14² │14² │14² │ ...│
+├────┼────┼────┼────┤
+│ ...            ...│
+└───────────────────┘
+
+      16 × 16 patches
+```
+
+最后将每个 14 * 14 * 3 的 patch 通过卷积映射成 1152 维向量，这里的 Conv 并不是传统 CNN 中那种提取特征，它实际上是充当 ViT patch embedding
+
+最终得到 `[B, 16, 16, 1152]` 形状的视觉 feature
+
+```python
+x = jnp.reshape(x, [n, h * w, c])
+```
+
+#### get_posemb
+
+经过这层变化后得到 `[B, 256, 1152]`，此时每个 batch 中有 256 个 visual embeddings，每个维度是 1152，由于没有 positional embedding，所以 Transformer 现在不知道它们对应的 patch:
+
+```python
+# Add posemb before adding extra token.  
+x = out["with_posemb"] = x + get_posemb(self, self.posemb, (h, w), c, "pos_embedding", jnp.float32) # self.posemb = "learn"
+
+
+def get_posemb(self, typ, seqshape, width, name, dtype=jnp.float32):  
+    if typ == "learn":  
+        return self.param(  
+            name,  
+            nn.initializers.normal(stddev=1 / np.sqrt(width)),  
+            (1, np.prod(seqshape), width),  # 得到的位置编码形状是 [1, 16 * 16, 1152]
+            dtype,  
+        )  
+    if typ == "sincos2d":  
+        return posemb_sincos_2d(*seqshape, width, dtype=dtype)  
+    raise ValueError(f"Unknown posemb type: {typ}")
+    
+```
+
+这里的 patch 的位置向量实际上并不是它在图片中真正的空间位置，真正的空间位置其实在切割时就已经确定，而是由 `nn.initializers.normal` 初始化的形状为 `[B, 256, 1152]` 的向量：
+
+```python
+# flax/linen/module.py
+def param(  
+  self,  
+  name: str,  
+  init_fn: Callable[..., T],  
+  *init_args,  
+  unbox: bool = True,  
+  **init_kwargs,  
+) -> T | meta.AxisMetadata[T]:
+```
+
+```
+以 6 个 patch 为例：
+
+2 × 3 裁剪后的 patch 天然就具备位置关系，而这个关系是 learn 这个 type 不需要的
+
+P00  P01  P02
+P10  P11  P12
+
+x[:,0,0,:] = P00 embedding
+x[:,0,1,:] = P01 embedding
+x[:,0,2,:] = P02 embedding
+
+x[:,1,0,:] = P10 embedding
+...
+
+reshape 后
+
+x[:,0,:] = P00
+x[:,1,:] = P01
+x[:,2,:] = P02
+x[:,3,:] = P10
+x[:,4,:] = P11
+x[:,5,:] = P12
+
+构造一批位置向量，随机初始化，后续由训练时自动确定：
+Epos0
+Epos1
+Epos2
+Epos3
+Epos4
+Epos5
+
+最后广播拼接：
+P00_embedding + Epos0
+P01_embedding + Epos1
+P02_embedding + Epos2
+P10_embedding + Epos3
+P11_embedding + Epos4
+P12_embedding + Epos5
+```
+
+为什么需要空间向量: 因为 Transformer 的 self-attention 本身并不知道 token 的空间顺序，假设有两个 patch embedding 分别是 A 和 B，如果没有尾随一个位置向量，Transformer 更接近把它们当成同一组 token 的不同排列。所以需要一个相对位置空间表示，而这种表示会在学习中逐渐确定位置，所以说这种 type 叫 learn
+
+所以说总结这一块：Conv 首先产生 `[B,256,1152]` 的视觉 patch embeddings；模型另外维护一个形状为 `[1,256,1152]` 的可学习 absolute positional embedding。它最初通过正态分布随机初始化，并在训练过程中优化。第 `k` 个位置向量固定加到第 `k` 个 patch embedding 上，从而给视觉内容注入位置信息，使 Transformer 能区分处于不同图像位置的 patch。
+
+接下来由于 `pool_type="none"` 所以并不会添加 `cls` token，接下来是 `Dropout` ，由于 `_Module` 默认 `dropout=0` 所以影响不大。最后再将 float32 精度转换回模型计算时使用的 bflout16 精度：
+```python
+if self.pool_type == "tok":  
+    cls = self.param("cls", nn.initializers.zeros, (1, 1, c), x.dtype)  
+    x = jnp.concatenate([jnp.tile(cls, [n, 1, 1]), x], axis=1)  
+  
+n, _, c = x.shape  # n,l,d  
+x = nn.Dropout(rate=self.dropout)(x, not train)  
+  
+# Kevin edit: now cast back to dtype_mm (potentially half precision)  
+x = x.astype(self.dtype_mm)
+```
+
+#### Encoder
+
+根据上面参数解析，这里的 `self.depth=27`，所以说这里的 `SigLIP Transformer` 是 27 层：
+
+```python
+x, out["encoder"] = Encoder(  
+    depth=self.depth,  # 27
+    mlp_dim=self.mlp_dim,  # 4304
+    num_heads=self.num_heads,  # 16
+    dropout=self.dropout,  # 0.0
+    scan=self.scan,  # True
+    remat_policy=self.remat_policy,  # nothing_savable
+    dtype_mm=self.dtype_mm,
+    name="Transformer",  
+)(x, deterministic=not train)  
+encoded = out["encoded"] = x
+```
+
+```python
+class Encoder(nn.Module):  
+    """Transformer Model Encoder for sequence to sequence translation."""  
+  
+    depth: int  
+    mlp_dim: int | None = None  # Defaults to 4x input dim  
+    num_heads: int = 12  
+    dropout: float = 0.0  
+    scan: bool = False  
+    remat_policy: str = "nothing_saveable"  
+    dtype_mm: str = "float32"  
+  
+    @nn.compact  
+    def __call__(self, x, deterministic=True):  # noqa: FBT002  
+        out = {}  
+  
+        if self.scan:  
+            block = nn.remat(  
+                Encoder1DBlock,  
+                prevent_cse=False,  
+                static_argnums=(2,),  # 0=self, 2=deterministic  
+                policy=getattr(jax.checkpoint_policies, self.remat_policy, None),  
+            )  
+            x, scan_out = nn.scan(  
+                block,  
+                variable_axes={"params": 0},  
+                split_rngs={"params": True, "dropout": True},  
+                in_axes=nn.broadcast,  
+                length=self.depth,  
+            )(  
+                name="encoderblock",  
+                dtype_mm=self.dtype_mm,  
+                mlp_dim=self.mlp_dim,  
+                num_heads=self.num_heads,  
+                dropout=self.dropout,  
+            )(x, deterministic)  
+            for lyr in range(self.depth):  
+                out[f"block{lyr:02d}"] = jax.tree.map(lambda o, lyr=lyr: o[lyr], scan_out)  
+        else:  
+            # Input Encoder  
+            for lyr in range(self.depth):  
+                block_cur = Encoder1DBlock(  
+                    name=f"encoderblock_{lyr}",  
+                    dtype_mm=self.dtype_mm,  
+                    mlp_dim=self.mlp_dim,  
+                    num_heads=self.num_heads,  
+                    dropout=self.dropout,  
+                )  
+                x, out[f"block{lyr:02d}"] = block_cur(x, deterministic)  
+            out["pre_ln"] = x  # Alias for last block, but without the number in it.  
+  
+        return nn.LayerNorm(name="encoder_norm", dtype=self.dtype_mm)(x), out
+```
+
+这里 `scan` 值是 True，所以会走上面的流程。但是下面的逻辑更简单更便于理解整体想要做什么，所以我们先看下面：
+
+```
+x = EncoderBlock0(x)
+x = EncoderBlock1(x)
+x = EncoderBlock2(x)
+...
+x = EncoderBlock26(x)
+```
+
+所以其实就是，每个 token 都逐渐融合其它 patch 的信息：
+
+```
+[B, 256, 1152]
+       ↓
+    Block 0
+       ↓
+[B, 256, 1152]
+       ↓
+    Block 1
+       ↓
+[B, 256, 1152]
+       ↓
+      ...
+       ↓
+    Block 26
+       ↓
+[B, 256, 1152]
+```
+
+而真正做 transformer 运算的其实是 `Encoder1DBlock`:
+
+```python
+class Encoder1DBlock(nn.Module):  
+    """Single transformer encoder block (MHSA + MLP)."""  
+  
+    mlp_dim: int | None = None  # Defaults to 4x input dim  
+    num_heads: int = 12  
+    dropout: float = 0.0  
+    dtype_mm: str = "float32"  
+  
+    @nn.compact  
+    def __call__(self, x, deterministic=True):  # noqa: FBT002  
+        out = {}  
+        x = sharding.activation_sharding_constraint(x)  # 与设备并行和 sharding 有关，可以先忽略
+        y = nn.LayerNorm(dtype=self.dtype_mm)(x)  # Pre-LayerNorm 将输入分布控制在 [-1, 1] 稳定训练过程
+        y = out["sa"] = nn.MultiHeadDotProductAttention(  # 视觉 Transformer 核心
+            num_heads=self.num_heads, 
+            kernel_init=nn.initializers.xavier_uniform(),  
+            deterministic=deterministic,  
+            dtype=self.dtype_mm,  
+        )(y, y) 
+        y = sharding.activation_sharding_constraint(y)  
+        y = nn.Dropout(rate=self.dropout)(y, deterministic)  
+        x = out["+sa"] = x + y  
+  
+        y = nn.LayerNorm(dtype=self.dtype_mm)(x)  
+        y = out["mlp"] = MlpBlock(  
+            mlp_dim=self.mlp_dim,  
+            dropout=self.dropout,  
+            dtype_mm=self.dtype_mm,  
+        )(y, deterministic)  
+        y = sharding.activation_sharding_constraint(y)  
+        y = nn.Dropout(rate=self.dropout)(y, deterministic)  
+        x = out["+mlp"] = x + y  
+        x = sharding.activation_sharding_constraint(x)  
+        return x, out
+```
+
+简化流程如下：
+
+```
+                   ┌───────────────────┐
+                   │                   │
+x ──→ LayerNorm ─→ Self-Attention ─→ + ──→ x'
+│                                      ↑
+└──────────────────────────────────────┘
+
+                   ┌───────────────────┐
+                   │                   │
+x' ─→ LayerNorm ─→ MLP ─────────────→ + ──→ x''
+│                                      ↑
+└──────────────────────────────────────┘
+```
+
+##### Encoder1DBlock
+###### self-attention
+
+这里有 16 个注意力头，`hidden dimension=1152` ，所以每个 head 维度通常为 `1152 / 16 = 72`，理论上 `[B, 256, 1152]` 会投影得到 Q、K、V，然后拆成 `[B, 16, 256, 72]`，也就是 `batch, 16 heads, 256 tokens, 72 dims`，每个 `head` 单独计算 $\text{Attension}(Q,K,V)=softmax(\frac{QK^T}{\sqrt{d_k}})V$
+
+```python
+        y = out["sa"] = nn.MultiHeadDotProductAttention(  # 视觉 Transformer 核心
+            num_heads=self.num_heads,  # 16 个注意力头
+            kernel_init=nn.initializers.xavier_uniform(),  
+            deterministic=deterministic,  
+            dtype=self.dtype_mm,  
+        )(y, y)  # query = y, key/value source = y ，因为 q/k/v 一致，所以是 self-attention，同一轮输入的 256 个视觉 patch token 互相看
+```
+
+这里的自注意力是 Transformer 从局部 patch embedding 逐渐形成全局视觉语义的关键。在进入自注意力后，每个 token 不再只是单独处理自己的 patch，而是会计算自己与同一序列中的其它 token 之间的注意力分数，进而可以从其它 patch 获取信息。比如本来 patch 描述狗的眼睛，经过处理后，它会关注耳朵 patch，鼻子 patch 等。 
+
+之后是，得到的 attention 输出并没有直接替换原来的 token，而是在原来的 representation 上做增量更新：
+
+```python
+        y = sharding.activation_sharding_constraint(y)  
+        y = nn.Dropout(rate=self.dropout)(y, deterministic)  
+        x = out["+sa"] = x + y  
+```
+
+###### MLP
+
+在增量更新后再次进行 LayerNorm 标准化输入分布，然后送入 MLP 中进行处理：
+
+```python
+        y = out["mlp"] = MlpBlock(  
+            mlp_dim=self.mlp_dim,  
+            dropout=self.dropout,  
+            dtype_mm=self.dtype_mm,  
+        )(y, deterministic) 
+```
+
+这里 `d = 1152, mlp_dim = 4304`：
+
+```python
+class MlpBlock(nn.Module):  
+    """Transformer MLP / feed-forward block."""  
+  
+    mlp_dim: int | None = None  # Defaults to 4x input dim  
+    dropout: float = 0.0  
+    dtype_mm: str = "float32"  
+  
+    @nn.compact  
+    def __call__(self, x, deterministic=True):  # noqa: FBT002  
+        """Applies Transformer MlpBlock module."""  
+        inits = {  
+            "kernel_init": nn.initializers.xavier_uniform(),  
+            "bias_init": nn.initializers.normal(stddev=1e-6),  
+        }  
+  
+        _, _, d = x.shape  # n,l,d  
+        x = nn.Dense(self.mlp_dim or 4 * d, dtype=self.dtype_mm, **inits)(x)  
+        x = nn.gelu(x)  
+        x = nn.Dropout(rate=self.dropout)(x, deterministic)  
+        return nn.Dense(d, dtype=self.dtype_mm, **inits)(x)
+```
+
+因为 `self.mlp_dim` 不是 None，所以数据变换如下 `1152 -> 4034 -> 1152`：
+
+```
+[B,256,1152]
+      ↓ Dense
+
+[B,256,4304]
+      ↓ GELU
+
+[B,256,4304]
+      ↓ Dense
+
+[B,256,1152]
+```
+
+`attention` 做 token 之间的信息交换，而 MLP 做每个 token 内部的 feature transformation，在 MLP 之后又是一次增量更新。
+
+所以说整个 27 层 Block，每经过一层，patch token 就会融合更多的全局上下文，并经过特征变换。
+
+##### scan=True
+
+现在再回到 `scan=True` 的流程，remat 就是做计算与内存之前的权衡，用于节省训练时需要的显存：
+
+- forward 时不保存所有中间 activation；
+- backward 时重新计算一部分 activation。
+
+```python
+block = nn.remat(
+    Encoder1DBlock,
+    prevent_cse=False,
+    static_argnums=(2,),
+    policy=getattr(
+        jax.checkpoint_policies,
+        self.remat_policy,
+        None
+    ),
+)
+```
+
+接下来使用 `scan` 高效表达 27 层重复结构，每个 `Encoder1DBlock` 返回 `x, out`，其中 `out["sa"]/out["+sa"]/out["mlp"]/out["+mlp"]` 有四个记录的值，`nn.scan` 跑完 27 层后把输出堆起来就是 `scan_out`：
+
+```python
+x, scan_out = nn.scan(
+    block,
+    variable_axes={"params": 0}, # 参数沿着 0 维堆叠，每一层都是独立的参数
+    split_rngs={"params": True, "dropout": True},
+    in_axes=nn.broadcast,
+    length=self.depth,
+)(
+    name="encoderblock",
+    dtype_mm=self.dtype_mm,
+    mlp_dim=self.mlp_dim,
+    num_heads=self.num_heads,
+    dropout=self.dropout,
+)(x, deterministic)
+```
+
+之后将输入重新拆出，并最终 `LayerNorm`：
+
+```
+out["block00"]
+out["block01"]
+...
+out["block26"]
+```
+
+```python
+for lyr in range(self.depth):
+    out[f"block{lyr:02d}"] = jax.tree.map(
+        lambda o, lyr=lyr: o[lyr],
+        scan_out
+    )
+return nn.LayerNorm(name="encoder_norm", dtype=self.dtype_mm)(x), out
+```
+
+最后会输出 out，out 中记录了 `out[f"block{lyr:02d}"]` 每一层的 feature 值
+
+从 `Conv` 到 `Encoder` 整个 SigLIP vision Encoder 到目前的流程如下：
+
+```
+Image
+[B,224,224,3]
+
+        ↓
+
+14×14 Patch Embedding Conv
+
+        ↓
+
+[B,16,16,1152]
+
+        ↓ flatten
+
+256 patch tokens
+[B,256,1152]
+
+        ↓
+
++ learned positional embedding
+
+        ↓
+
+[B,256,1152]
+
+        ↓
+─────────────────────────────
+       Transformer Encoder
+─────────────────────────────
+
+        ↓
+
+Block 0
+├─ LayerNorm
+├─ Multi-Head Self-Attention
+├─ Residual
+├─ LayerNorm
+├─ MLP 1152→4304→1152
+└─ Residual
+
+        ↓
+
+Block 1
+
+        ↓
+       ...
+
+        ↓
+
+Block 26
+
+        ↓
+
+Final LayerNorm
+
+        ↓
+
+[B,256,1152]
+```
+
+至此 Encoder 部分结束，得到了真正意义上的视觉 embeddings：raw SigLIP visual token embeddings，它也是候选特征。它还没有经过 PaliGemma 投影到 LLM 空间中。就像 OpenVLA 中经过 DINOv2+SigLIP 处理后还没有经过投影进入 llama 中。
+
+### pool_type="none"/rep_size=False
+
+不进行池化，所以 feature 形状不会改变，保留每个 patch 的表达：
+
+```python
+if self.pool_type == "map":  
+    x = out["head_input"] = MAPHead(  
+        num_heads=self.num_heads,  
+        mlp_dim=self.mlp_dim,  
+        dtype=self.dtype_mm,  
+    )(x)  
+elif self.pool_type == "gap":  
+    x = out["head_input"] = jnp.mean(x, axis=1)  
+elif self.pool_type == "0":  
+    x = out["head_input"] = x[:, 0]  
+elif self.pool_type == "tok":  
+    x = out["head_input"] = x[:, 0]  
+    encoded = encoded[:, 1:]  
+elif self.pool_type == "none":  
+    pass  
+else:  
+    raise ValueError(f"Unknown pool type: '{self.pool_type}'")  
+  
+x_2d = jnp.reshape(encoded, [n, h, w, -1])  
+  
+if self.rep_size:  
+    rep_size = self.width if self.rep_size is True else self.rep_size  
+    hid = nn.Dense(rep_size, dtype=self.dtype_mm, name="pre_logits")  
+    # NOTE: In the past we did not include tanh in pre_logits.  
+    # For few-shot, it should not matter much, as it whitens anyways.    x_2d = nn.tanh(hid(x_2d))  
+    x = nn.tanh(hid(x))
+```
+
+### num\_classes
+
+这里做了最后一个维度变换 `1152 -> 2048`，将视觉信息进行处理，投影到 `gemma` 也就是 llm 的维度空间，至此第二个候选 feature 也出现了，它对应的就是 openvla 的经过 MLP 投影过的特征：
+
+```python
+out["pre_logits_2d"] = x_2d  
+out["pre_logits"] = x  # 目前与 encoded 结果一致
+  
+if self.num_classes:  
+    kw = {"kernel_init": nn.initializers.zeros} if self.head_zeroinit else {}  
+    head = nn.Dense(self.num_classes, dtype=self.dtype_mm, name="head", **kw)  
+    x_2d = out["logits_2d"] = head(x_2d)  
+    x = out["logits"] = head(x)  
+  
+return x, out
+```
+
+至此整个视觉链条可以清晰表达出来：
+
+```
+RGB
+[B,224,224,3]
+        │
+        ▼
+Conv patch embedding
+kernel=14, stride=14
+        │
+        ▼
+stem
+[B,16,16,1152]
+        │
+        ▼
+flatten
+        │
+        ▼
+[B,256,1152]
+        │
+        ▼
++ learned position embedding
+        │
+        ▼
+with_posemb
+[B,256,1152]
+        │
+        ▼
+27 × SigLIP Transformer Blocks
+        │
+        ▼
+encoder LayerNorm
+        │
+        ▼
+encoded
+[B,256,1152]
+        │
+        │   ← Candidate V1
+        │
+        ▼
+Dense head
+1152 → 2048
+        │
+        ▼
+logits / image_tokens
+[B,256,2048]
+        │
+        │   ← Candidate V2
+        ▼
+Gemma / PaliGemma
+```
+
+
+> [!NOTE]- 为什么 224×224 最后恰好产生 256 个 visual tokens？
+> 每个 224 \* 224 的图片对应的一个 patch 的大小是 14 \* 14，所以 224/14=16，16 \* 16 = 256 个 patch ，每个 patch 对应一个 visual tokens，所以是 256 个
+
+> [!NOTE]-  `stem` 和 `encoded` 有什么本质区别？
+> 首先是 shape 不同，stem 还没有展开。最本质的区别应该是：stem 是经过 nn.Conv 编码后的 patch feature，它还没有经过注意力机制，它的信息只能描述自己，而 encoded 经过注意力机制的处理，它涵盖的信息包含了与同意序列中的其它视觉 feature 的关系
+
+
+> [!NOTE]- positional embedding 是在 Transformer 前还是后加入？
+> 在 transformer 前加入
+
+
+> [!NOTE]- `pool_type="none"` 为什么对我们的 shared-feature 研究很重要？
+> 它没有把每个 patch 的视觉 feature 全部展开成一张完整图的 feature，这样便于我们研究模型对哪块 patch 更为关注，同样 libero 图片中的同一个 patch 如果在两个模型中都很重要，那么这个 patch 就是我们需要重点关注的
+
+
+> [!NOTE]- `out["encoded"]` 与 `image_tokens` 为什么维度分别是 1152 和 2048？
+> out["encoded"] 是 Multi-Head-Self-Attention 得到的结果，在注意力机制处理中 feature 维度没有变化。而最后的 image\_tokens 是需要输入到 gemma llm 中的，是纯视觉 token 经过 MLP 投影得到的，而 gemma 的 feature 维度是 2048，所以投影后的结果必须是 2048
+
+
+> [!Note]- `out["encoded"]` 和 `out["pre_logits"]` 在当前 π0 配置下是不是两个不同 representation？
+> 目前是同一个
+
+
