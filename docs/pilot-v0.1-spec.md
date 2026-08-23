@@ -4,7 +4,7 @@
 
 本 Pilot 的目标是验证：
 
-> OpenVLA 与 π0 对同一批 LIBERO observations 的视觉 representation 中，是否存在稳定、可泛化、且显著强于随机配对的 shared structure。
+> OpenVLA 与 π0.5 对同一批 LIBERO observations 的视觉 representation 中，是否存在稳定、可泛化、且显著强于随机配对的 shared structure。
 
 当前阶段只验证：
 
@@ -36,7 +36,7 @@ Pilot v0.1 是一个 **read-only representation feasibility experiment**。
 - Tex3D texture optimization；
 - token-level shared attack；
 - object-region shared attack；
-- π0 Gemma / Action Expert feature objective；
+- π0.5 Gemma / Action Expert feature objective；
 - multi-VLA ensemble attack。
 
 本阶段只执行：
@@ -46,7 +46,7 @@ LIBERO observation collection
         ↓
 OpenVLA representation extraction
         ↓
-π0 representation extraction
+π0.5 representation extraction
         ↓
 offline paired representation analysis
 ```
@@ -59,12 +59,12 @@ offline paired representation analysis
 
 Pilot observation dataset 由 **OpenVLA rollout** 产生。
 
-OpenVLA 和 π0 不分别执行 rollout。
+OpenVLA 和 π0.5 不分别执行 rollout。
 
 原因是必须保证：
 
 $$
-x_i^{OpenVLA}=x_i^{\pi_0}=x_i
+x_i^{OpenVLA}=x_i^{\pi_{0.5}}=x_i
 $$
 
 即两个模型处理完全相同的外部 observation。
@@ -78,17 +78,17 @@ LIBERO rollout
       ↓
 save observations
       ↓
-      ├───────────────┐
-      ↓               ↓
-OpenVLA extractor   π0 extractor
-      ↓               ↓
+      ├────────────────┐
+      ↓                ↓
+OpenVLA extractor   π0.5 extractor
+      ↓                ↓
 representation O     representation P
-      └──── paired ───┘
+      └──── paired ────┘
 ```
 
 Pilot 中发现的 representation structure 因此首先是在 OpenVLA-induced state distribution 上进行验证。
 
-其他 rollout source，例如 π0 rollout 或 expert demonstrations，可作为未来 distribution control，而不是 Pilot v0.1 的必要组成部分。
+其他 rollout source，例如 π0.5 rollout 或 expert demonstrations，可作为未来 distribution control，而不是 Pilot v0.1 的必要组成部分。
 
 ---
 
@@ -210,7 +210,7 @@ same raw observation
       │
       ├── OpenVLA native preprocessing
       │
-      └── π0 native preprocessing
+      └── π0.5 native preprocessing
 ```
 
 两个模型分别使用自己的 inference preprocessing。
@@ -248,11 +248,27 @@ Pilot v0.1 的 cross-model representation comparison 只使用：
 base / agent-view image
 ```
 
-不把 π0 wrist-camera representation 混入主分析。
+不把 π0.5 wrist-camera representation 混入主分析。
 
-原因是当前 OpenVLA LIBERO policy 主要使用 base image，而 π0 可以使用额外 wrist observations。
+原因是当前 OpenVLA LIBERO policy 主要使用 base image，而 π0.5 可以使用额外 wrist observations。
 
 Pilot 需要首先保证 representation comparison 的外部视觉输入语义一致。
+
+因此主比较遵循：
+
+```text
+same raw base image
+        │
+        ├── OpenVLA native preprocessing
+        │       ↓
+        │     O1-S / O2
+        │
+        └── π0.5 native preprocessing
+                ↓
+              P1 / P2
+```
+
+π0.5 的 wrist-camera representation 可以作为未来 supplementary / multi-view experiment，但不属于 Pilot v0.1 主结果。
 
 ---
 
@@ -288,7 +304,7 @@ Pilot 预期单 sample 形状：
 [256, 1152]
 ```
 
-O1-S 的主要作用是作为跨模型 backbone-level control node，便于后续与 π0 的 SigLIP representation 进行直接比较。
+O1-S 的主要作用是作为跨模型 backbone-level control node，便于后续与 π0.5 的 SigLIP representation 进行直接比较。
 
 ---
 
@@ -363,51 +379,392 @@ Pilot v0.1 不要求提取更深的 Llama language-conditioned visual hidden sta
 
 ---
 
-## 10. π0 Representation Nodes
+## 10. π0.5 Representation Extraction
 
-Pilot 提取两个 π0 representation nodes。
+### DECISION — Target Model
 
-### P1 — V1 Raw SigLIP Representation
-
-形状约为：
-
-$$
-[256,1152]
-$$
-
-对应：
+Pilot v0.1 的 Physical Intelligence 侧模型固定为：
 
 ```text
-SigLIP encoder output
-after final encoder normalization
-before PaliGemma projection
+π0.5
 ```
 
-### P2 — V2 Projected Representation
-
-形状约为：
-
-$$
-[256,2048]
-$$
-
-对应：
+使用 OpenPI 官方 LIBERO configuration：
 
 ```text
-PaliGemma-ready image token embeddings
+config = "pi05_libero"
+checkpoint = "gs://openpi-assets/checkpoints/pi05_libero"
 ```
 
-即：
+对应模型配置为：
+
+```python
+Pi0Config(
+    pi05=True,
+    action_horizon=10,
+    discrete_state_input=False,
+)
+```
+
+Pilot v0.1 不使用 classic π0，也不使用 π0-FAST。
+
+选择 `pi05_libero` 的原因是：
+
+- 它是当前 OpenPI 官方 LIBERO inference configuration；
+- 存在官方发布的 LIBERO-specific checkpoint；
+- 不需要引入自行 fine-tune classic π0 所产生的额外 checkpoint / training confounder；
+- 当前 Pilot 的科学问题关注 cross-VLA shared representation，而不是特定历史 π0 checkpoint。
+
+---
+
+### π0.5 Visual Architecture
+
+### FACT
+
+π0.5 与 classic π0 在当前 Pilot 所关注的 early visual path 上使用相同的 SigLIP construction：
 
 ```text
-SigLIP visual representation
-        ↓
+SigLIP So400m/14
+```
+
+其关键结构为：
+
+```text
+input resolution = 224 × 224
+patch size       = 14 × 14
+patch grid       = 16 × 16
+token count      = 256
+
+SigLIP width     = 1152
+SigLIP depth     = 27
+PaliGemma width  = 2048
+```
+
+因此 π0.5 的视觉路径可概括为：
+
+```text
+image
+  ↓
+SigLIP So400m/14
+  ↓
+encoder output
+[256, 1152]
+  ↓
 Dense 1152 → 2048
-        ↓
-image_tokens
+  ↓
+PaliGemma-ready image tokens
+[256, 2048]
 ```
 
-Pilot v0.1 不等待 Gemma language-conditioned V3 representation 完成 audit 后才启动。
+π0.5 相比 classic π0 的主要结构变化发生在该视觉路径之后，包括 state handling 和 Action Expert timestep conditioning。
+
+因此这些变化不改变当前 Pilot 的 P1 / P2 extraction points。
+
+---
+
+### π0.5 Camera Construction
+
+### DECISION
+
+π0.5 官方 LIBERO input 构造三个 image slots：
+
+```text
+base_0_rgb
+left_wrist_0_rgb
+right_wrist_0_rgb
+```
+
+其中：
+
+```text
+base_0_rgb        = real base / agent-view image
+left_wrist_0_rgb  = real wrist image
+right_wrist_0_rgb = zero padding image
+```
+
+对应 mask 为：
+
+```text
+base_0_rgb        = True
+left_wrist_0_rgb  = True
+right_wrist_0_rgb = False
+```
+
+C3 仍然完整构造官方三路 image-slot input，以保持真实 `pi05_libero` inference semantics。
+
+但 Pilot v0.1 的 cross-model representation analysis 只提取：
+
+```text
+base_0_rgb
+```
+
+对应的 P1 / P2。
+
+不保存 wrist-camera representation 作为主 feature nodes。
+
+---
+
+### π0.5 Inference Preprocessing
+
+### DECISION
+
+C3 必须从现有 `PilotObservation` 重建官方 `pi05_libero` inference input。
+
+输入字段为：
+
+```text
+PilotObservation.base_rgb_raw
+PilotObservation.wrist_rgb_raw
+PilotObservation.state
+PilotObservation.prompt
+```
+
+重建为：
+
+```python
+{
+    "observation/image": record.base_rgb_raw,
+    "observation/wrist_image": record.wrist_rgb_raw,
+    "observation/state": record.state,
+    "prompt": record.prompt,
+}
+```
+
+C3 必须复用 OpenPI 官方 `pi05_libero` input transforms。
+
+禁止实现独立的手工图像 preprocessing 来替代官方 transform pipeline。
+
+主要 inference preprocessing 路径为：
+
+```text
+PilotObservation
+        ↓
+construct LIBERO inference dict
+        ↓
+LiberoInputs(model_type=PI05)
+        ↓
+image slots:
+    base_0_rgb
+    left_wrist_0_rgb
+    right_wrist_0_rgb=zeros
+
+image masks:
+    True
+    True
+    False
+        ↓
+checkpoint normalization pipeline
+        ↓
+ResizeImages(224, 224)
+using OpenPI resize_with_pad
+        ↓
+TokenizePrompt
+        ↓
+PadStatesAndActions
+        ↓
+Observation.from_dict
+        ↓
+uint8 image
+→ float32
+→ [-1, 1]
+        ↓
+preprocess_observation(
+    None,
+    observation,
+    train=False,
+)
+        ↓
+observation.images["base_0_rgb"]
+```
+
+`preprocess_observation(..., train=False)` 属于真实 π0.5 inference path，因此 C3 保留该调用。
+
+由于 model transforms 已经将图像 resize 至 `224 × 224`，正常情况下该步骤不会再次改变 image geometry，也不会在 inference 时施加随机 augmentation。
+
+C3 不允许使用：
+
+- PIL manual resize；
+- ImageNet mean/std normalization；
+- OpenVLA preprocessing；
+- 自行实现的 SigLIP image normalization；
+
+来替代官方 OpenPI preprocessing。
+
+OpenVLA 与 π0.5 必须从相同的原始：
+
+```text
+PilotObservation.base_rgb_raw
+```
+
+独立执行各自 native preprocessing。
+
+---
+
+### P1 — π0.5 SigLIP Encoder Representation
+
+### DECISION
+
+P1 定义为：
+
+```text
+π0.5 SigLIP So400m/14 encoder output
+after final encoder normalization
+before the 1152 → 2048 image projection
+```
+
+C3 使用真实 π0.5 visual module：
+
+```python
+p2, aux = model.PaliGemma.img(
+    observation.images["base_0_rgb"],
+    train=False,
+)
+
+p1 = aux["encoded"]
+```
+
+因此：
+
+```text
+P1 = aux["encoded"]
+```
+
+Pilot 预期单 sample 形状：
+
+```text
+[256, 1152]
+```
+
+P1 保存完整 256 个 visual patch tokens。
+
+不允许在 extraction 阶段执行 mean pooling。
+
+P1 的主要作用是与 OpenVLA O1-S 形成 backbone-level comparison：
+
+```text
+OpenVLA O1-S
+[256, 1152]
+
+        ↕
+
+π0.5 P1
+[256, 1152]
+```
+
+该比较主要回答：
+
+> 两个 VLA 的 SigLIP-level representation 是否具有稳定的 shared structure？
+
+---
+
+### P2 — π0.5 Projected Image-Token Representation
+
+### DECISION
+
+P2 定义为：
+
+```text
+π0.5 PaliGemma-ready projected image tokens
+after the SigLIP 1152 → 2048 projection
+before deeper Gemma processing
+```
+
+直接使用：
+
+```python
+p2, aux = model.PaliGemma.img(
+    observation.images["base_0_rgb"],
+    train=False,
+)
+```
+
+中的：
+
+```text
+P2 = p2
+```
+
+Pilot 预期单 sample 形状：
+
+```text
+[256, 2048]
+```
+
+P2 是 `Pi0.embed_prefix()` 实际继续送入后续 PaliGemma / Gemma prefix processing 的 image-token representation。
+
+因此：
+
+```text
+P1
+[256, 1152]
+    ↓
+SigLIP image projection
+Dense 1152 → 2048
+    ↓
+P2
+[256, 2048]
+```
+
+P2 用于与 OpenVLA O2 比较两个 VLA 各自完成 model-specific visual adaptation 后的 shared structure：
+
+```text
+OpenVLA O2
+[256, 4096]
+
+        ↕
+
+π0.5 P2
+[256, 2048]
+```
+
+O2 与 P2 不要求具有相同 feature dimension。
+
+后续 PCA / CCA 等 statistical pipeline 负责处理不同 representation dimensions。
+
+---
+
+### Extraction Mechanism
+
+### DECISION
+
+C3 必须通过真实 model module boundary 直接提取：
+
+```python
+p2, aux = model.PaliGemma.img(
+    observation.images["base_0_rgb"],
+    train=False,
+)
+
+p1 = aux["encoded"]
+```
+
+禁止：
+
+- forward hooks；
+- 修改 OpenPI `siglip.py`；
+- 修改 `Pi0.embed_prefix()`；
+- 复制 / 重写 SigLIP forward；
+- 单独加载另一个 standalone SigLIP；
+- 提取更深 Gemma / Action Expert hidden states。
+
+C3 只保存当前冻结的：
+
+```text
+P1
+P2
+```
+
+即使 SigLIP auxiliary output 中还包含：
+
+```text
+stem
+with_posemb
+encoder internals
+pre_logits
+logits
+```
+
+Pilot v0.1 也不保存这些额外节点。
 
 ---
 
@@ -485,7 +842,7 @@ O2:   [256,4096]
 ```
 
 ```text
-π0
+π0.5
 
 P1: [256,1152]
 P2: [256,2048]
@@ -528,7 +885,33 @@ one OpenVLA feature artifact
     └── O2
 ```
 
+对于 π0.5：
+
+```text
+{sample_id}.npz
+```
+
+单个 archive 同时保存：
+
+```text
+p1_siglip
+p2_projected
+metadata_json
+```
+
+即：
+
+```text
+one sample
+    ↓
+one π0.5 feature artifact
+    ├── P1
+    └── P2
+```
+
 不要求每个 node 单独保存为独立文件。
+
+两个模型侧 extractor 都不得在 serialization 前执行 mean pooling。
 
 该设计的目的是保证同一 observation 上多个 representation nodes 的 provenance 和 identity 始终绑定。
 
@@ -569,9 +952,16 @@ source_model = "openvla"
 feature_schema_version = "openvla_features_v1"
 ```
 
+对于 π0.5 当前 C3 schema：
+
+```text
+source_model = "pi05"
+feature_schema_version = "pi05_features_v1"
+```
+
 ### Source Image Hash
 
-`source_image_hash` 用于确认 OpenVLA 和 π0 representation 确实来自完全相同的原始视觉 observation。
+`source_image_hash` 用于确认 OpenVLA 和 π0.5 representation 确实来自完全相同的原始视觉 observation。
 
 Pilot v0.1 冻结：
 
@@ -618,8 +1008,11 @@ hash 必须针对 preprocessing 之前的原始 `base_rgb_raw` 计算。
 
 - OpenVLA resize 后图像；
 - OpenVLA center-cropped 图像；
-- processor normalized tensor；
-- π0-specific preprocessed image。
+- OpenVLA processor normalized tensor；
+- π0.5 `ResizeImages` 后图像；
+- `Observation.images["base_0_rgb"]`；
+- SigLIP input tensor；
+- 其他 model-specific preprocessed image。
 
 原因是 Pilot 的 cross-model identity 定义在：
 
@@ -635,28 +1028,37 @@ same model-specific input tensor
 
 ### Cross-model Alignment Check
 
-在任何 OpenVLA ↔ π0 statistical analysis 前，必须验证：
+在任何 OpenVLA ↔ π0.5 statistical analysis 前，必须验证：
 
 ```text
-OpenVLA.sample_id == π0.sample_id
+OpenVLA.sample_id == π0.5.sample_id
 ```
 
 并且：
 
 ```text
-OpenVLA.source_image_hash == π0.source_image_hash
+OpenVLA.source_image_hash == π0.5.source_image_hash
 ```
 
 如果任一条件不成立，analysis 必须失败，而不是继续计算。
 
 ### Node Metadata
 
-由于一个 feature artifact 可以同时保存多个 representation nodes：
+由于一个 feature artifact 可以同时保存多个 representation nodes，例如：
 
 ```text
+OpenVLA:
 o1_siglip
 o1_fused
 o2_projected
+```
+
+以及：
+
+```text
+π0.5:
+p1_siglip
+p2_projected
 ```
 
 不再要求 feature record 使用单一：
@@ -711,7 +1113,7 @@ observations/
 
 features/
     openvla/
-    pi0/
+    pi05/
 
 analysis/
     pilot_v0.1/
@@ -752,7 +1154,7 @@ $$
 
 Mean-pooled analysis 回答：
 
-> OpenVLA 与 π0 对整张 observation 的 global visual representation 是否存在稳定的 cross-model correspondence？
+> OpenVLA 与 π0.5 对整张 observation 的 global visual representation 是否存在稳定的 cross-model correspondence？
 
 它不回答：
 
@@ -861,7 +1263,7 @@ CCA
 
 ### PCA / SVD
 
-OpenVLA 与 π0 分别独立 fit PCA/SVD。
+OpenVLA 与 π0.5 分别独立 fit PCA/SVD。
 
 两侧不要求保留相同 dimension。
 
@@ -881,7 +1283,7 @@ $$
 
 ```text
 OpenVLA: 4096 → 73
-π0:      2048 → 58
+π0.5:    2048 → 58
 ```
 
 ### CCA
@@ -1202,7 +1604,7 @@ $$
 =
 \mathcal L_{OpenVLA}
 +
-\mathcal L_{\pi_0}
+\mathcal L_{\pi_{0.5}}
 $$
 
 这样的 ensemble attack。
@@ -1237,7 +1639,7 @@ Codex 每次 coding task 必须满足：
 
 不得因为本文件描述了未来模块而提前实现：
 
-- π0 extractor；
+- π0.5 extractor 之后的模块；
 - CCA；
 - CKA；
 - regression；
@@ -1264,7 +1666,7 @@ Stop condition
 
 Pilot v0.1 可以概括为：
 
-> 使用 OpenVLA 在同一 LIBERO task 的 10 个固定 initial states 上执行 rollout，采集约 200 个 paired raw observations。随后分别在独立模型环境中提取 OpenVLA 的 SigLIP branch representation（O1-S）、fused DINOv2+SigLIP pre-projector representation（O1-F）、projector representation（O2），以及 π0 的 SigLIP / projected visual-token representations（P1/P2）。主实验优先比较 O1-S ↔ P1 与 O2 ↔ P2，O1-F 作为 supplementary diagnostic node。每帧首先使用 mean pooling 得到 global representation，在 train episodes 上执行 train-only PCA/SVD → CCA，并使用 Linear CKA 和 linear regression 作为辅助指标。最终只在完整 held-out episodes 上评测，并与 repeated shuffled-pairing null baseline 比较，以判断跨 VLA global visual representation 是否存在稳定、可泛化的 shared structure。
+> 使用 OpenVLA 在同一 LIBERO task 的 10 个固定 initial states 上执行 rollout，采集约 200 个 paired raw observations。随后分别使用各模型自己的 native inference preprocessing：在 OpenVLA 侧提取 SigLIP branch representation（O1-S）、fused DINOv2+SigLIP pre-projector representation（O1-F）和 projector representation（O2）；在 π0.5 `pi05_libero` 侧，从同一 `base_rgb_raw` 重建官方 LIBERO inference input，并仅使用 `base_0_rgb` 提取 SigLIP encoder representation（P1）和 PaliGemma-ready projected image-token representation（P2）。主实验优先比较 O1-S ↔ P1 与 O2 ↔ P2，O1-F 作为 supplementary diagnostic node。所有 extractor 均保存完整 token tensors；每帧仅在后续 statistical analysis 阶段执行 mean pooling 得到 global representation。在 train episodes 上执行 train-only PCA/SVD → CCA，并使用 Linear CKA 和 linear regression 作为辅助指标。最终只在完整 held-out episodes 上评测，并与 repeated shuffled-pairing null baseline 比较，以判断 OpenVLA 与 π0.5 的 global visual representations 是否存在稳定、可泛化的 shared structure。
 
 ---
 
@@ -1281,9 +1683,16 @@ Pilot v0.1 可以概括为：
 - train/held-out split；
 - camera choice；
 - OpenVLA nodes O1-S / O1-F / O2；
-- π0 nodes P1 / P2；
+- π0.5 target model：`pi05_libero`；
+- π0.5 official LIBERO checkpoint；
+- π0.5 native inference preprocessing；
+- π0.5 standard three-image-slot input construction；
+- π0.5 base-camera-only representation policy；
+- π0.5 node P1 = SigLIP encoder output `[256,1152]`；
+- π0.5 node P2 = PaliGemma-ready projected image tokens `[256,2048]`；
+- direct π0.5 extraction via `model.PaliGemma.img(...)`；
 - full-token serialization；
-- multi-node OpenVLA feature record；
+- multi-node model-side feature records；
 - `sample_id` + `source_image_hash` alignment rules；
 - mean-pooled primary analysis；
 - SVCCA-style CCA；
@@ -1297,12 +1706,13 @@ Pilot v0.1 可以概括为：
 - Pilot observation schema（C0）；
 - OpenVLA rollout observation collector（C1）；
 - C1 real OpenVLA / LIBERO smoke integration；
-- OpenVLA representation extractor（C2）— PASS
-  C2 real OpenVLA / GPU smoke integration — PASS
+- OpenVLA representation extractor（C2）— PASS；
+- C2 real OpenVLA / GPU smoke integration — PASS。
 
 ### NOT YET IMPLEMENTED
 
-- π0 representation extractor；
+- π0.5 representation extractor（C3）；
+- C3 real π0.5 smoke integration；
 - paired-feature validator；
 - SVCCA analysis；
 - CKA analysis；
@@ -1311,4 +1721,4 @@ Pilot v0.1 可以概括为：
 
 ### NEXT STEP
 
-Implement and validate the π0 representation extractor before paired cross-model analysis.
+Implement and validate the π0.5 `pi05_libero` representation extractor（C3）before paired cross-model analysis.
