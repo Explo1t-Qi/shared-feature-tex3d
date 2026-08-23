@@ -1297,11 +1297,8 @@ Pilot v0.1 可以概括为：
 - Pilot observation schema（C0）；
 - OpenVLA rollout observation collector（C1）；
 - C1 real OpenVLA / LIBERO smoke integration；
-- OpenVLA representation extractor（C2）— unit-level PASS。
-
-### PENDING VALIDATION
-
-- C2 real OpenVLA / GPU smoke integration。
+- OpenVLA representation extractor（C2）— PASS
+  C2 real OpenVLA / GPU smoke integration — PASS
 
 ### NOT YET IMPLEMENTED
 
@@ -1314,4 +1311,4 @@ Pilot v0.1 可以概括为：
 
 ### NEXT STEP
 
-Run the C2 real OpenVLA / GPU smoke integration before starting π0 extraction.
+Implement and validate the π0 representation extractor before paired cross-model analysis.
