@@ -213,7 +213,7 @@ same raw observation
       └── π0 native preprocessing
 ```
 
-两个模型分别使用自己的官方 inference preprocessing。
+两个模型分别使用自己的 inference preprocessing。
 
 ### Required Sample Metadata
 
@@ -258,30 +258,106 @@ Pilot 需要首先保证 representation comparison 的外部视觉输入语义�
 
 ## 9. OpenVLA Representation Nodes
 
-Pilot 提取两个 OpenVLA representation nodes。
+### DECISION
 
-### O1 — SigLIP Raw Representation
+Pilot v0.1 对 OpenVLA 保存三个视觉 representation nodes：
 
-作为 backbone-level comparison node。
+```text
+O1-S
+O1-F
+O2
+```
+
+其中：
+
+### O1-S — OpenVLA SigLIP Branch Representation
 
 语义：
 
 ```text
-SigLIP visual representation
+OpenVLA fused visual backbone 中的 SigLIP branch representation
+before DINO/SigLIP feature fusion
 before OpenVLA multimodal projector
 ```
 
-### O2 — Projector Representation
+对应 OpenVLA 实际 inference path 中 SigLIP featurizer 的输出。
 
-作为 OpenVLA-adapted visual representation。
+Pilot 预期单 sample 形状：
+
+```text
+[256, 1152]
+```
+
+O1-S 的主要作用是作为跨模型 backbone-level control node，便于后续与 π0 的 SigLIP representation 进行直接比较。
+
+---
+
+### O1-F — OpenVLA Fused DINOv2 + SigLIP Representation
 
 语义：
 
 ```text
-vision representation
-after OpenVLA projector
+DINOv2 visual representation
+        +
+SigLIP visual representation
+        ↓
+concat along feature dimension
+        ↓
+full OpenVLA pre-projector visual representation
+```
+
+即：
+
+```text
+O1-F = concat(DINOv2 feature, SigLIP feature)
+```
+
+Pilot 预期单 sample 形状：
+
+```text
+[256, 2176]
+```
+
+O1-F 是 OpenVLA multimodal projector 实际接收的完整视觉 representation。
+
+O1-F 用于区分：
+
+```text
+shared SigLIP-backbone structure
+```
+
+与：
+
+```text
+OpenVLA full fused visual structure
+```
+
+之间的差异。
+
+当前 Pilot 不要求 O1-F 必须成为跨模型主比较节点；它首先作为 diagnostic / supplementary representation 保存。
+
+---
+
+### O2 — OpenVLA Projector Representation
+
+语义：
+
+```text
+O1-F
+    ↓
+OpenVLA multimodal projector
+    ↓
+VLA-adapted visual representation
 before deeper Llama processing
 ```
+
+Pilot 预期单 sample 形状：
+
+```text
+[256, 4096]
+```
+
+O2 用于研究视觉 representation 经过 OpenVLA-specific multimodal adaptation 后，跨模型 shared structure 是否仍然存在。
 
 Pilot v0.1 不要求提取更深的 Llama language-conditioned visual hidden states。
 
@@ -337,38 +413,56 @@ Pilot v0.1 不等待 Gemma language-conditioned V3 representation 完成 audit �
 
 ## 11. Primary Cross-Model Pairs
 
-主实验只分析：
+### DECISION
+
+Pilot 主实验仍优先分析：
 
 $$
-O1\leftrightarrow P1
+O1\text{-}S \leftrightarrow P1
 $$
 
 和：
 
 $$
-O2\leftrightarrow P2
+O2 \leftrightarrow P2
 $$
 
-### O1 ↔ P1
+### O1-S ↔ P1
 
 回答：
 
-> backbone-level visual representations 是否具有 shared structure？
+> 两个 VLA 中的 SigLIP-level visual representations 是否具有稳定的 shared structure？
+
+该比较主要作为 shared-backbone-level baseline / control。
 
 ### O2 ↔ P2
 
 回答：
 
-> representation 经过各自 VLA-specific adaptation 后，shared structure 是否仍然存在？
+> representation 经过各自 VLA-specific visual adaptation 后，shared structure 是否仍然存在？
 
-以下组合暂不作为 Pilot 主结果：
+### O1-F
+
+O1-F 当前作为 OpenVLA-side diagnostic / supplementary node 保存。
+
+它可以用于后续分析：
 
 ```text
-O1 ↔ P2
-O2 ↔ P1
+O1-S vs O1-F
 ```
 
-未来可以作为 supplementary analysis。
+以判断加入 DINOv2 fusion 后，OpenVLA representation 的 cross-model correspondence 如何变化。
+
+当前 Pilot 不预先冻结：
+
+```text
+O1-F ↔ P1
+O1-F ↔ P2
+```
+
+为主结果。
+
+这些组合可在 supplementary analysis 中探索，但不得替代冻结的主比较对，除非后续研究决策显式更新。
 
 ---
 
@@ -385,8 +479,9 @@ Extractor 必须保存完整 token representation。
 ```text
 OpenVLA
 
-O1: [256, d1]
-O2: [256, d2]
+O1-S: [256,1152]
+O1-F: [256,2176]
+O2:   [256,4096]
 ```
 
 ```text
@@ -403,9 +498,43 @@ P2: [256,2048]
 - object-region pooling；
 - spatial shared-feature analysis。
 
+### Multi-node Feature Record
+
+一个 observation 对应一个模型侧 feature record。
+
+对于 OpenVLA：
+
+```text
+{sample_id}.npz
+```
+
+单个 archive 同时保存：
+
+```text
+o1_siglip
+o1_fused
+o2_projected
+metadata_json
+```
+
+即：
+
+```text
+one sample
+    ↓
+one OpenVLA feature artifact
+    ├── O1-S
+    ├── O1-F
+    └── O2
+```
+
+不要求每个 node 单独保存为独立文件。
+
+该设计的目的是保证同一 observation 上多个 representation nodes 的 provenance 和 identity 始终绑定。
+
 ---
 
-## 13. Sample Alignment
+## 13. Sample Alignment and Feature Provenance
 
 ### DECISION
 
@@ -423,19 +552,90 @@ sample_id
 - 数组 index；
 - extractor 输出顺序。
 
-Feature record 至少包含：
+每个模型侧 feature record 至少包含：
 
 ```text
 sample_id
-model_name
+source_model
 checkpoint
-node_name
-feature_shape
-feature_dtype
+feature_schema_version
 source_image_hash
 ```
 
-统计分析前必须验证：
+对于 OpenVLA 当前 C2 schema：
+
+```text
+source_model = "openvla"
+feature_schema_version = "openvla_features_v1"
+```
+
+### Source Image Hash
+
+`source_image_hash` 用于确认 OpenVLA 和 π0 representation 确实来自完全相同的原始视觉 observation。
+
+Pilot v0.1 冻结：
+
+```text
+hash algorithm = SHA-256
+```
+
+hash source 为：
+
+```text
+PilotObservation.base_rgb_raw
+```
+
+在验证其为：
+
+```text
+shape = [H, W, 3]
+dtype = uint8
+```
+
+后，对其 C-contiguous raw bytes 计算：
+
+```python
+hashlib.sha256(
+    np.ascontiguousarray(base_rgb_raw).tobytes()
+).hexdigest()
+```
+
+推荐 metadata 表示为：
+
+```text
+sha256:<hex_digest>
+```
+
+例如：
+
+```text
+sha256:0123abcd...
+```
+
+hash 必须针对 preprocessing 之前的原始 `base_rgb_raw` 计算。
+
+不得对以下内容计算跨模型 pairing hash：
+
+- OpenVLA resize 后图像；
+- OpenVLA center-cropped 图像；
+- processor normalized tensor；
+- π0-specific preprocessed image。
+
+原因是 Pilot 的 cross-model identity 定义在：
+
+```text
+same raw external observation
+```
+
+而不是：
+
+```text
+same model-specific input tensor
+```
+
+### Cross-model Alignment Check
+
+在任何 OpenVLA ↔ π0 statistical analysis 前，必须验证：
 
 ```text
 OpenVLA.sample_id == π0.sample_id
@@ -448,6 +648,37 @@ OpenVLA.source_image_hash == π0.source_image_hash
 ```
 
 如果任一条件不成立，analysis 必须失败，而不是继续计算。
+
+### Node Metadata
+
+由于一个 feature artifact 可以同时保存多个 representation nodes：
+
+```text
+o1_siglip
+o1_fused
+o2_projected
+```
+
+不再要求 feature record 使用单一：
+
+```text
+node_name
+```
+
+字段。
+
+每个 node 的：
+
+```text
+shape
+dtype
+```
+
+由对应 NumPy array 本身定义，并由 extractor 在写入和加载时进行显式验证。
+
+当前 Pilot 不要求在 `metadata_json` 中重复保存每个 node 的 shape/dtype。
+
+如果未来引入跨版本 schema migration，再考虑加入结构化 `nodes` metadata。
 
 ---
 
@@ -793,8 +1024,10 @@ Pilot 最终控制为简单、可解释的输出。
 
 | Representation Pair | Held-Out CCA Top-1 | Held-Out CCA Top-5 Mean | Linear CKA | Regression $R^2$ | Shuffled Baseline |
 | ------------------- | -----------------: | ----------------------: | ---------: | ---------------: | ----------------: |
-| O1 ↔ P1             |                    |                         |            |                  |                   |
+| O1-S ↔ P1           |                    |                         |            |                  |                   |
 | O2 ↔ P2             |                    |                         |            |                  |                   |
+
+O1-F 相关比较如果执行，应作为 supplementary / diagnostic result，不替代上述主结果。
 
 ### Figure 1 — CCA Spectrum
 
@@ -867,7 +1100,7 @@ shared-feature attack objective
 
 - correct 略高于 shuffled；
 - CCA / CKA / regression 结论冲突；
-- O1 ↔ P1 很强但 O2 ↔ P2 明显变弱；
+- O1-S ↔ P1 很强但 O2 ↔ P2 明显变弱；
 - PCA threshold 对结果影响极大。
 
 此时先检查：
@@ -905,7 +1138,7 @@ Regression
 需要特别关注：
 
 ```text
-O1 ↔ P1 strong
+O1-S ↔ P1 strong
 O2 ↔ P2 weak
 ```
 
@@ -918,11 +1151,23 @@ O2 ↔ P2 weak
 如果：
 
 ```text
-O1 ↔ P1 strong
+O1-S ↔ P1 strong
 O2 ↔ P2 also clearly above shuffled
 ```
 
 则 evidence 更强，因为 shared structure 不仅存在于底层 vision backbone。
+
+O1-F 可以作为 diagnostic node，进一步帮助判断：
+
+```text
+SigLIP-only shared structure
+        ↓
+DINOv2 + SigLIP fused representation
+        ↓
+OpenVLA projector representation
+```
+
+在 OpenVLA representation hierarchy 中如何变化。
 
 Pilot 的核心科学问题因此不仅是：
 
@@ -1019,7 +1264,7 @@ Stop condition
 
 Pilot v0.1 可以概括为：
 
-> 使用 OpenVLA 在同一 LIBERO task 的 10 个固定 initial states 上执行 rollout，采集约 200 个 paired raw observations。随后分别在独立模型环境中提取 OpenVLA SigLIP/projector 与 π0 SigLIP/projected visual-token representations。每帧首先使用 mean pooling 得到 global representation，在 train episodes 上执行 train-only PCA/SVD → CCA，并使用 Linear CKA 和 linear regression 作为辅助指标。最终只在完整 held-out episodes 上评测，并与 repeated shuffled-pairing null baseline 比较，以判断跨 VLA global visual representation 是否存在稳定、可泛化的 shared structure。
+> 使用 OpenVLA 在同一 LIBERO task 的 10 个固定 initial states 上执行 rollout，采集约 200 个 paired raw observations。随后分别在独立模型环境中提取 OpenVLA 的 SigLIP branch representation（O1-S）、fused DINOv2+SigLIP pre-projector representation（O1-F）、projector representation（O2），以及 π0 的 SigLIP / projected visual-token representations（P1/P2）。主实验优先比较 O1-S ↔ P1 与 O2 ↔ P2，O1-F 作为 supplementary diagnostic node。每帧首先使用 mean pooling 得到 global representation，在 train episodes 上执行 train-only PCA/SVD → CCA，并使用 Linear CKA 和 linear regression 作为辅助指标。最终只在完整 held-out episodes 上评测，并与 repeated shuffled-pairing null baseline 比较，以判断跨 VLA global visual representation 是否存在稳定、可泛化的 shared structure。
 
 ---
 
@@ -1035,10 +1280,11 @@ Pilot v0.1 可以概括为：
 - frame sampling principle；
 - train/held-out split；
 - camera choice；
-- OpenVLA nodes O1/O2；
-- π0 nodes P1/P2；
+- OpenVLA nodes O1-S / O1-F / O2；
+- π0 nodes P1 / P2；
 - full-token serialization；
-- sample alignment rules；
+- multi-node OpenVLA feature record；
+- `sample_id` + `source_image_hash` alignment rules；
 - mean-pooled primary analysis；
 - SVCCA-style CCA；
 - PCA explained-variance principle；
@@ -1046,11 +1292,19 @@ Pilot v0.1 可以概括为：
 - CKA / regression supporting metrics；
 - PASS / UNCERTAIN / FAIL interpretation。
 
+### IMPLEMENTED / PASS
+
+- Pilot observation schema（C0）；
+- OpenVLA rollout observation collector（C1）；
+- C1 real OpenVLA / LIBERO smoke integration；
+- OpenVLA representation extractor（C2）— unit-level PASS。
+
+### PENDING VALIDATION
+
+- C2 real OpenVLA / GPU smoke integration。
+
 ### NOT YET IMPLEMENTED
 
-- Pilot observation schema；
-- rollout collector；
-- OpenVLA representation extractor；
 - π0 representation extractor；
 - paired-feature validator；
 - SVCCA analysis；
@@ -1060,390 +1314,4 @@ Pilot v0.1 可以概括为：
 
 ### NEXT STEP
 
-将 Pilot implementation 拆分为多个独立 Codex coding contracts，并从最小的数据 schema / observation collector 开始。
-
-
-
-## 9. OpenVLA Representation Nodes
-
-### DECISION
-
-Pilot v0.1 对 OpenVLA 保存三个视觉 representation nodes：
-
-```text
-O1-S
-O1-F
-O2
-```
-
-其中：
-
-### O1-S — OpenVLA SigLIP Branch Representation
-
-语义：
-
-```text
-OpenVLA fused visual backbone 中的 SigLIP branch representation
-before DINO/SigLIP feature fusion
-before OpenVLA multimodal projector
-```
-
-对应 OpenVLA 实际 inference path 中 SigLIP featurizer 的输出。
-
-Pilot 预期单 sample 形状：
-
-```text
-[256, 1152]
-```
-
-O1-S 的主要作用是作为跨模型 backbone-level control node，便于后续与 π0 的 SigLIP representation 进行直接比较。
-
----
-
-### O1-F — OpenVLA Fused DINOv2 + SigLIP Representation
-
-语义：
-
-```text
-DINOv2 visual representation
-        +
-SigLIP visual representation
-        ↓
-concat along feature dimension
-        ↓
-full OpenVLA pre-projector visual representation
-```
-
-即：
-
-```text
-O1-F = concat(DINOv2 feature, SigLIP feature)
-```
-
-Pilot 预期单 sample 形状：
-
-```text
-[256, 2176]
-```
-
-O1-F 是 OpenVLA multimodal projector 实际接收的完整视觉 representation。
-
-O1-F 用于区分：
-
-```text
-shared SigLIP-backbone structure
-```
-
-与：
-
-```text
-OpenVLA full fused visual structure
-```
-
-之间的差异。
-
-当前 Pilot 不要求 O1-F 必须成为跨模型主比较节点；它首先作为 diagnostic / supplementary representation 保存。
-
----
-
-### O2 — OpenVLA Projector Representation
-
-语义：
-
-```text
-O1-F
-    ↓
-OpenVLA multimodal projector
-    ↓
-VLA-adapted visual representation
-before deeper Llama processing
-```
-
-Pilot 预期单 sample 形状：
-
-```text
-[256, 4096]
-```
-
-O2 用于研究视觉 representation 经过 OpenVLA-specific multimodal adaptation 后，跨模型 shared structure 是否仍然存在。
-
-Pilot v0.1 不要求提取更深的 Llama language-conditioned visual hidden states。
-
----
-
-## 11. Primary Cross-Model Pairs
-
-### DECISION
-
-Pilot 主实验仍优先分析：
-
-$$
-O1\text{-}S \leftrightarrow P1
-$$
-
-和：
-
-$$
-O2 \leftrightarrow P2
-$$
-
-### O1-S ↔ P1
-
-回答：
-
-> 两个 VLA 中的 SigLIP-level visual representations 是否具有稳定的 shared structure？
-
-该比较主要作为 shared-backbone-level baseline / control。
-
-### O2 ↔ P2
-
-回答：
-
-> representation 经过各自 VLA-specific visual adaptation 后，shared structure 是否仍然存在？
-
-### O1-F
-
-O1-F 当前作为 OpenVLA-side diagnostic / supplementary node 保存。
-
-它可以用于后续分析：
-
-```text
-O1-S vs O1-F
-```
-
-以判断加入 DINOv2 fusion 后，OpenVLA representation 的 cross-model correspondence 如何变化。
-
-当前 Pilot 不预先冻结：
-
-```text
-O1-F ↔ P1
-O1-F ↔ P2
-```
-
-为主结果。
-
-这些组合可在 supplementary analysis 中探索，但不得替代冻结的主比较对，除非后续研究决策显式更新。
-
----
-
-## 12. Feature Serialization
-
-### DECISION
-
-Extractor 必须保存完整 token representation。
-
-禁止在 extraction 阶段只保存 mean-pooled vector。
-
-例如：
-
-```text
-OpenVLA
-
-O1-S: [256,1152]
-O1-F: [256,2176]
-O2:   [256,4096]
-```
-
-```text
-π0
-
-P1: [256,1152]
-P2: [256,2048]
-```
-
-保存完整 token tensor 的目的是让同一 representation dataset 未来能够支持：
-
-- global mean pooling；
-- token-level analysis；
-- object-region pooling；
-- spatial shared-feature analysis。
-
----
-
-### Multi-node Feature Record
-
-一个 observation 对应一个模型侧 feature record。
-
-对于 OpenVLA：
-
-```text
-{sample_id}.npz
-```
-
-单个 archive 同时保存：
-
-```text
-o1_siglip
-o1_fused
-o2_projected
-metadata_json
-```
-
-即：
-
-```text
-one sample
-    ↓
-one OpenVLA feature artifact
-    ├── O1-S
-    ├── O1-F
-    └── O2
-```
-
-不要求每个 node 单独保存为独立文件。
-
-该设计的目的是保证同一 observation 上多个 representation nodes 的 provenance 和 identity 始终绑定。
-
----
-
-## 13. Sample Alignment and Feature Provenance
-
-### DECISION
-
-所有 observation 和 representation 必须通过稳定的：
-
-```text
-sample_id
-```
-
-进行关联。
-
-禁止依赖：
-
-- 文件排序；
-- 数组 index；
-- extractor 输出顺序。
-
-每个模型侧 feature record 至少包含：
-
-```text
-sample_id
-source_model
-checkpoint
-feature_schema_version
-source_image_hash
-```
-
-对于 OpenVLA 当前 C2 schema：
-
-```text
-source_model = "openvla"
-feature_schema_version = "openvla_features_v1"
-```
-
----
-
-### Source Image Hash
-
-`source_image_hash` 用于确认 OpenVLA 和 π0 representation 确实来自完全相同的原始视觉 observation。
-
-Pilot v0.1 冻结：
-
-```text
-hash algorithm = SHA-256
-```
-
-hash source 为：
-
-```text
-PilotObservation.base_rgb_raw
-```
-
-在验证其为：
-
-```text
-shape = [H, W, 3]
-dtype = uint8
-```
-
-后，对其 C-contiguous raw bytes 计算：
-
-```python
-hashlib.sha256(
-    np.ascontiguousarray(base_rgb_raw).tobytes()
-).hexdigest()
-```
-
-推荐 metadata 表示为：
-
-```text
-sha256:<hex_digest>
-```
-
-例如：
-
-```text
-sha256:0123abcd...
-```
-
-hash 必须针对 preprocessing 之前的原始 `base_rgb_raw` 计算。
-
-不得对以下内容计算跨模型 pairing hash：
-
-- OpenVLA resize 后图像；
-- OpenVLA center-cropped 图像；
-- processor normalized tensor；
-- π0-specific preprocessed image。
-
-原因是 Pilot 的 cross-model identity 定义在：
-
-```text
-same raw external observation
-```
-
-而不是：
-
-```text
-same model-specific input tensor
-```
-
----
-
-### Cross-model Alignment Check
-
-在任何 OpenVLA ↔ π0 statistical analysis 前，必须验证：
-
-```text
-OpenVLA.sample_id == π0.sample_id
-```
-
-并且：
-
-```text
-OpenVLA.source_image_hash == π0.source_image_hash
-```
-
-如果任一条件不成立，analysis 必须失败，而不是继续计算。
-
----
-
-### Node Metadata
-
-由于一个 feature artifact 可以同时保存多个 representation nodes：
-
-```text
-o1_siglip
-o1_fused
-o2_projected
-```
-
-不再要求 feature record 使用单一：
-
-```text
-node_name
-```
-
-字段。
-
-每个 node 的：
-
-```text
-shape
-dtype
-```
-
-由对应 NumPy array 本身定义，并由 extractor 在写入和加载时进行显式验证。
-
-当前 Pilot 不要求在 `metadata_json` 中重复保存每个 node 的 shape/dtype。
-
-如果未来引入跨版本 schema migration，再考虑加入结构化 `nodes` metadata。
+Run the C2 real OpenVLA / GPU smoke integration before starting π0 extraction.
