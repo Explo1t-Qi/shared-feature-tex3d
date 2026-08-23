@@ -1,968 +1,1048 @@
-- - # C2 Contract — OpenVLA Representation Extractor
+- - # C3 Coding Contract — π0.5 Representation Extractor
 
-    ## 0. Status
+    ## Goal
 
-    **Current coding milestone:** C2 — OpenVLA Representation Extractor
+    Implement the Pilot v0.1 π0.5 representation extractor for the official OpenPI LIBERO model:
 
-    Prerequisites:
+        config = "pi05_libero"
+        checkpoint = "gs://openpi-assets/checkpoints/pi05_libero"
+    
+    The extractor must:
+    
+    1. load existing PilotObservation records;
+    2. reproduce the official OpenPI LIBERO client-side image preprocessing;
+    3. reconstruct the official pi05_libero policy input;
+    4. reuse the official OpenPI server-side inference transforms;
+    5. construct the batched model Observation using official semantics;
+    6. extract the base-camera π0.5 visual representations P1 and P2;
+    7. preserve sample identity and provenance;
+    8. serialize one feature artifact per observation.
 
-    - C0 `PilotObservation` schema: **PASS**
-    - C1 LIBERO observation collector: **PASS**
-    - C1 real OpenVLA/LIBERO smoke integration: **PASS**
+    This task is C3 extractor implementation only.
 
-    C2 operates only on the observations produced by C1.
+    Do not implement the real π0.5 integration smoke in this turn.
+    
+    ---
+    
+    ## Scientific Contract
+    
+    Pilot v0.1 compares:
+    
+        OpenVLA O1-S ↔ π0.5 P1
+        OpenVLA O2   ↔ π0.5 P2
+    
+    The frozen Physical Intelligence target is:
+    
+        config = "pi05_libero"
+    
+    with official released checkpoint identifier:
+    
+        checkpoint = "gs://openpi-assets/checkpoints/pi05_libero"
+    
+    The relevant model semantics are:
+    
+        Pi0Config(
+            pi05=True,
+            action_horizon=10,
+            discrete_state_input=False,
+        )
+    
+    Do not substitute:
+    
+    - classic π0;
+    - π0-FAST;
+    - another OpenPI checkpoint;
+    - another standalone SigLIP implementation.
 
-    C2 does **not** implement π0 extraction, shared-space discovery, PCA, CCA, CKA, regression, attack optimization, or Tex3D modifications.
+    The scientific preprocessing design has already been audited against OpenPI commit:
+
+        15a9616a00943ada6c20a0f158e3adb39df2ccac
+    
+    Do not reopen or modify the frozen scientific design unless implementation reveals a genuine source contradiction.
+    
+    ---
+    
+    ## Allowed Production Files
+    
+    Prefer no more than:
+    
+        shared_feature/pi05_features.py
+        shared_feature/__init__.py
+    
+    Tests may add:
+    
+        tests/test_pi05_features.py
+    
+    Do not modify unrelated production files.
+    
+    Do not modify:
+    
+        ../openpi
+        ../openvla
+        ../LIBERO
+        ../tex3d
+        ../modified-tex3d
+
+    If implementation cannot satisfy this contract without modifying upstream OpenPI or changing the frozen scientific semantics, STOP and report the blocker.
+
+    ---
+    
+    ## Forbidden Scope
+
+    Do not implement or modify:
+
+    - C3 real π0.5 integration smoke;
+    - checkpoint model downloading/loading inside the core extractor;
+    - paired-feature validator;
+    - PCA / SVD;
+    - CCA / SVCCA;
+    - CKA;
+    - linear regression;
+    - mean pooling;
+    - token-level analysis;
+    - object-region analysis;
+    - Tex3D integration;
+    - shared-feature attack loss;
+    - adversarial texture optimization;
+    - Gemma hidden-state extraction;
+    - Action Expert feature extraction;
+    - wrist-camera feature serialization;
+    - OpenVLA C2 behavior;
+    - OpenPI source code;
+    - forward hooks;
+    - duplicated SigLIP forward implementations;
+    - standalone replacement vision encoders;
+    - unrelated refactors.
+    
+    Do not mark full C3 PASS in this task.
+    
+    ---
+    
+    ## Public API
+    
+    Implement:
+    
+        class Pi05FeatureExtractionError(RuntimeError):
+            ...
+
+    and:
+
+        def extract_pi05_features(
+            *,
+            model,
+            train_config,
+            checkpoint: str | Path,
+            norm_stats,
+            observation_paths: Sequence[str | Path],
+            output_dir: str | Path,
+            batch_size: int = 1,
+        ) -> tuple[Path, ...]:
+            ...
+
+    `norm_stats` is a required dependency.
+
+    It must represent the checkpoint-associated normalization statistics loaded by the caller from the same released checkpoint used for the model.
+
+    Do not provide a silent fallback to:
+
+        data_config.norm_stats
+
+    or unrelated local assets.
+
+    The `checkpoint` argument remains the stable provenance identifier used in output metadata.
+
+    The core extractor receives:
+
+    - an already loaded JAX/NNX-compatible π0.5 model;
+    - the corresponding pi05_libero TrainConfig;
+    - checkpoint-associated norm_stats.
+    
+    Do not make checkpoint downloading or complete policy construction part of the core extractor.
+    
+    Small private helpers are allowed.
+    
+    Do not expose unnecessary implementation details as public API.
+    
+    ---
+    
+    ## Norm-Stats Ownership
+    
+    The caller is responsible for loading checkpoint-associated norm stats using the official OpenPI checkpoint-loading path.
+    
+    The core extractor must only consume the supplied:
+    
+        norm_stats
+    
+    and must not trigger download of the full checkpoint.
+
+    The extractor must validate that supplied stats are compatible with the pi05_libero inference path.
+    
+    At minimum:
+    
+    - a `state` entry must be available;
+    - required quantile statistics for PI05 normalization must be present;
+    - malformed or incompatible stats must fail loudly.
+    
+    Do not silently replace missing checkpoint stats with configuration-default or stale local stats.
+    
+    ---
+    
+    ## Input Records
+    
+    Each input path must load through the existing:
+    
+        PilotObservation
+    
+    schema.
+    
+    The extractor requires:
+    
+        sample_id
+        base_rgb_raw
+        wrist_rgb_raw
+        state
+        prompt
+    
+    The returned tuple must preserve the exact input observation order.
+    
+    Reject:
+    
+    - missing input files;
+    - invalid PilotObservation archives;
+    - duplicate input paths;
+    - duplicate sample_id values;
+    - unsafe sample_id values;
+    - output collisions.
+
+    Do not depend on lexical filename ordering for sample identity.
 
     ---
 
-    # 1. Goal
+    ## Canonical State Validation
 
-    Implement a minimal OpenVLA representation extractor that:
+    C3 must explicitly validate the frozen C1 LIBERO state representation.
 
-    1. loads existing `PilotObservation` records;
-    2. reconstructs the exact OpenVLA policy-query visual preprocessing used by C1;
-    3. obtains the checkpoint processor's fused DINOv2 + SigLIP `pixel_values`;
-    4. directly calls existing OpenVLA vision submodules;
-    5. extracts and serializes three full token-level representations:
-       - O1-S: OpenVLA SigLIP branch feature;
-       - O1-F: fused DINOv2 + SigLIP feature;
-       - O2: OpenVLA multimodal projector output;
-    6. preserves one-to-one identity with the original Pilot `sample_id`.
+    Require:
+    
+        state.shape == (8,)
+    
+    with:
 
-    The extractor must not modify OpenVLA source code and must not use forward hooks.
+        real numeric dtype
+        all finite values
+    
+    The expected semantics are:
+    
+        eef_pos            3
+        axis-angle quat    3
+        gripper_qpos       2
+                           —
+                           8
+    
+    Do not silently reshape, truncate, pad, or reinterpret malformed source state before the official OpenPI transforms.
+    
+    The later official:
+    
+        PadStatesAndActions(32)
+    
+    is responsible for model-side state padding.
+    
+    ---
+    
+    ## Safe sample_id
+    
+    Because the output filename is:
+    
+        {sample_id}.npz
+    
+    `sample_id` must be a safe single filesystem path component.
+    
+    Reject values that would allow:
+    
+    - absolute paths;
+    - parent traversal;
+    - embedded path separators;
+    - `"."`;
+    - `".."`;
+    - escaping output_dir.
+    
+    Do not reject otherwise valid identifiers merely because they contain ordinary punctuation such as a period.
+
+    C1-generated Pilot sample IDs should pass unchanged.
 
     ---
 
-    # 2. Scientific scope
+    ## Raw Observation Semantics
 
-    C2 answers only:
+    PilotObservation stores raw LIBERO observations before π0.5-specific preprocessing.
 
-    > For each C1 policy-query observation, what visual representations does the real OpenVLA visual pipeline produce at the selected internal nodes?
+    In particular:
 
-    C2 does **not** yet answer:
+        base_rgb_raw
+        wrist_rgb_raw
+    
+    must remain unchanged as the common cross-model observation source.
 
-    - whether these features are shared with π0;
-    - whether they are transferable;
-    - whether they are policy-relevant;
-    - whether mean pooling is appropriate;
-    - whether a shared subspace exists.
+    The extractor must not mutate these arrays in place.
 
-    Those are later milestones.
+    Before preprocessing, validate both images:
 
-    ---
+        image.ndim == 3
+        image.shape[-1] == 3
+        image.dtype == uint8
 
-    # 3. Frozen OpenVLA representation nodes
-
-    For the current fused OpenVLA visual backbone:
-
-    ```text
-    policy image
-        ↓
-    PrismaticProcessor
-        ↓
-    pixel_values [B, 6, 224, 224]
-        ↓
-    split channels
-     ┌────────────────┬─────────────────┐
-     │ first 3 ch     │ last 3 ch       │
-     │ DINO input     │ SigLIP input    │
-     ↓                ↓
-    DINOv2          SigLIP
-                       │
-                       └──────────── O1-S
-            │           │
-            └─ concat ──┘
-                  ↓
-                 O1-F
-                  ↓
-              projector
-                  ↓
-                  O2
-    ```
-
-    ## 3.1 O1-S
-
-    Definition:
-
-    ```text
-    O1-S = output of OpenVLA's actual SigLIP branch featurizer
-    ```
-
-    Expected Pilot shape per sample:
-
-    ```text
-    [256, 1152]
-    ```
-
-    This is the representation actually used by the OpenVLA fused visual backbone.
-
-    Do not replace it with a separately instantiated SigLIP model.
-
-    Do not change its layer.
-
-    The OpenVLA featurizer is already configured so its forward path returns the actual second-to-last transformer-layer patch representation used by OpenVLA.
+    Do not compute provenance from any preprocessed image.
 
     ---
 
-    ## 3.2 O1-F
+    ## Source Image Hash
 
-    Definition:
+    Compute:
 
-    ```text
-    O1-F = concat(DINOv2 feature, SigLIP feature, dim=-1)
-    ```
+        source_image_hash
+    
+    from the ORIGINAL:
 
-    Expected Pilot shape per sample:
-
-    ```text
-    [256, 2176]
-    ```
-
-    This is exactly the full visual feature passed into the OpenVLA multimodal projector.
-
-    O1-F is the primary OpenVLA **pre-projector visual representation**.
-
-    ---
-
-    ## 3.3 O2
-
-    Definition:
-
-    ```text
-    O2 = model.projector(O1-F)
-    ```
-
-    Expected Pilot shape per sample:
-
-    ```text
-    [256, 4096]
-    ```
-
-    O2 is OpenVLA's VLA-adapted visual representation immediately after the multimodal projector and before insertion into the language-model input sequence.
-
-    ---
-
-    # 4. Extraction method — FROZEN
-
-    Use **direct calls to existing OpenVLA submodules**.
-
-    Do not use hooks.
-
-    Do not modify OpenVLA model source.
-
-    Do not run the full language model or `predict_action()` merely to obtain features.
-
-    Conceptually:
-
-    ```python
-    dino_pixels, siglip_pixels = torch.split(
-        pixel_values,
-        [3, 3],
-        dim=1,
-    )
-
-    dino_feature = model.vision_backbone.featurizer(
-        dino_pixels
-    )
-
-    siglip_feature = model.vision_backbone.fused_featurizer(
-        siglip_pixels
-    )
-
-    fused_feature = torch.cat(
-        [dino_feature, siglip_feature],
-        dim=-1,
-    )
-
-    projected_feature = model.projector(
-        fused_feature
-    )
-    ```
-
-    The implementation must reuse these already-loaded checkpoint modules.
-
-    Each DINO/SigLIP branch should be evaluated only once per batch.
-
-    Do not call:
-
-    ```python
-    model.vision_backbone(pixel_values)
-    ```
-
-    after separately calling both branch featurizers, because that would recompute the same features.
-
-    ---
-
-    # 5. Input source — FROZEN
-
-    C2 consumes serialized C1 `PilotObservation` records.
-
-    For OpenVLA C2:
-
-    ```text
-    use:
         PilotObservation.base_rgb_raw
 
-    do not use:
-        PilotObservation.wrist_rgb_raw
-    ```
-
-    Classic OpenVLA LIBERO policy uses the base/agent-view image only.
-
-    `state` is not an OpenVLA visual backbone input and must not affect O1-S/O1-F/O2 extraction.
-
-    The saved state and wrist image remain part of the Pilot observation dataset for later π0 and policy-level work.
-
-    ---
-
-    # 6. OpenVLA preprocessing semantics — FROZEN
-
-    C2 must reproduce the **actual C1 OpenVLA policy-query preprocessing**, not invent a new preprocessing path.
-
-    The scientific requirement is:
-
-    ```text
-    C2 feature input
-    ==
-    C1 rollout OpenVLA policy input
-    ```
-
-    C2 must not feed `base_rgb_raw` directly into the Hugging Face processor.
-
-    ---
-
-    ## 6.1 C1-compatible policy-image construction
-
-    Starting from:
-
-    ```python
-    record.base_rgb_raw
-    ```
-
-    reproduce the C1 path:
-
-    ```text
-    raw 512×512 agent-view observation
-        ↓
-    official get_libero_image(..., 512)
-        ↓
-    180° LIBERO rotation
-        ↓
-    JPEG encode/decode
-        ↓
-    C1 resize behavior
-        ↓
-    PIL resize to OpenVLA input size 224×224
-        ↓
-    OpenVLA center crop behavior
-        ↓
-    checkpoint processor
-    ```
-
-    C2 must preserve the currently validated C1 behavior even though upstream OpenVLA's standalone LIBERO evaluation path has a slightly different resize sequence.
-
-    Do not silently replace the C1 path with upstream:
-
-    ```text
-    get_libero_image(..., 224)
-    ```
-
-    during C2.
-
-    That baseline difference is a separate provenance/correctness note and is not a C2 change.
-
-    ---
-
-    ## 6.2 Center crop
-
-    For the current Pilot checkpoint:
-
-    ```text
-    center_crop = True
-    crop_scale = 0.9
-    ```
-
-    Use the same OpenVLA center-crop semantics already used by the real C1 rollout.
-
-    Reuse existing official OpenVLA preprocessing helpers where possible.
-
-    Do not independently invent a numerically different crop implementation.
-
-    ---
-
-    ## 6.3 Prompt / processor path
-
-    Use the checkpoint's existing `PrismaticProcessor`.
-
-    The processor must be the processor corresponding to the same OpenVLA checkpoint used during C1.
-
-    Use the Pilot record's exact:
-
-    ```python
-    record.prompt
-    ```
-
-    when reconstructing the OpenVLA action prompt.
-
-    Prompt formatting must follow the same OpenVLA checkpoint-dependent logic used by the official OpenVLA action path.
-
-    C2 needs only:
-
-    ```python
-    inputs["pixel_values"]
-    ```
-
-    and must not run language-model inference.
-
-    ---
-
-    # 7. Fused processor semantics — FROZEN
-
-    The checkpoint processor produces:
-
-    ```text
-    pixel_values: [B, 6, 224, 224]
-    ```
-
-    For the frozen `dinosiglip` backbone ordering:
-
-    ```text
-    pixel_values[:, 0:3]
-        = DINOv2-preprocessed RGB tensor
-
-    pixel_values[:, 3:6]
-        = SigLIP-preprocessed RGB tensor
-    ```
-
-    These two 3-channel tensors may use different backbone-specific normalization / transform parameters.
-
-    Therefore do **not** reuse the first three channels for both models.
-
-    Do not manually reproduce DINO/SigLIP normalization.
-
-    Use the checkpoint processor output directly.
-
-    Explicitly validate:
-
-    ```text
-    pixel_values.ndim == 4
-    pixel_values.shape[1] == 6
-    ```
-
-    before feature extraction.
-
-    ---
-
-    # 8. Model compatibility validation
-
-    C2 is Pilot-specific and should fail explicitly if the loaded model is incompatible with the frozen OpenVLA architecture.
-
-    At minimum verify that the model exposes:
-
-    ```text
-    model.vision_backbone
-    model.vision_backbone.featurizer
-    model.vision_backbone.fused_featurizer
-    model.projector
-    ```
-
-    and that the processor yields a six-channel fused visual input.
-
-    Do not silently adapt to a single-backbone OpenVLA checkpoint.
-
-    Do not introduce a generic VLA/backbone registry.
-
-    ---
-
-    # 9. Compute dtype and device — FROZEN
-
-    The current OpenVLA Pilot checkpoint is loaded for normal BF16 inference.
-
-    Feature extraction must preserve the loaded OpenVLA inference semantics.
-
-    Do not convert the entire model to FP32 for C2.
-
-    Do not reload the backbone separately.
+    before:
+
+    - 180° rotation;
+    - resize_with_pad;
+    - convert_to_uint8;
+    - LiberoInputs;
+    - normalization;
+    - Observation.from_dict;
+    - any other model-specific preprocessing.
 
     Use:
 
-    ```text
-    existing loaded model
-    existing model device
-    existing vision-model dtype
-    ```
+        hashlib.sha256(
+            np.ascontiguousarray(
+                record.base_rgb_raw
+            ).tobytes()
+        ).hexdigest()
+    
+    Serialize as:
 
-    for computation.
+        sha256:<hex_digest>
 
-    The extractor may determine the appropriate device/dtype from the loaded vision backbone parameters.
+    Do not compute the pairing hash from:
+    
+    - rotated images;
+    - resized images;
+    - client policy images;
+    - base_0_rgb;
+    - normalized images;
+    - SigLIP input arrays;
+    - wrist images.
 
-    Use inference-only execution:
-
-    ```python
-    model.eval()
-
-    with torch.inference_mode():
-        ...
-    ```
-
-    Do not enable gradients.
-
-    ---
-
-    # 10. Persisted feature dtype — FROZEN
-
-    Before serialization, every extracted representation must be:
-
-    ```text
-    detach
-    → float32
-    → CPU
-    → remove batch dimension
-    → NumPy array
-    ```
-
-    Persisted dtype:
-
-    ```text
-    float32
-    ```
-
-    Expected per-sample arrays:
-
-    ```text
-    o1_siglip:
-        shape = [256, 1152]
-        dtype = float32
-
-    o1_fused:
-        shape = [256, 2176]
-        dtype = float32
-
-    o2_projected:
-        shape = [256, 4096]
-        dtype = float32
-    ```
-
-    The FP32 serialization format is for stable downstream numerical analysis.
-
-    It does not imply that the OpenVLA forward itself was FP32.
+    This hash must remain directly comparable with the existing OpenVLA C2 source_image_hash.
 
     ---
 
-    # 11. Token preservation — FROZEN
+    ## Official LIBERO Client-Side Image Preprocessing
 
-    C2 must save the complete patch-token tensors.
+    This step is REQUIRED.
 
-    Do not mean-pool during extraction.
+    The official OpenPI LIBERO client performs model-specific image preprocessing before constructing the policy input dictionary.
+    
+    For both base and wrist images reproduce:
+    
+        raw LIBERO image
+            ↓
+        180° rotation
+            ↓
+        np.ascontiguousarray
+            ↓
+        openpi_client.image_tools.resize_with_pad(224, 224)
+            ↓
+        openpi_client.image_tools.convert_to_uint8
+    
+    The 180° rotation semantics are:
+    
+        image[::-1, ::-1]
+    
+    Equivalent behavior:
+    
+        base_image = np.ascontiguousarray(
+            record.base_rgb_raw[::-1, ::-1]
+        )
+        
+        wrist_image = np.ascontiguousarray(
+            record.wrist_rgb_raw[::-1, ::-1]
+        )
+        
+        base_image = image_tools.convert_to_uint8(
+            image_tools.resize_with_pad(
+                base_image,
+                224,
+                224,
+            )
+        )
+        
+        wrist_image = image_tools.convert_to_uint8(
+            image_tools.resize_with_pad(
+                wrist_image,
+                224,
+                224,
+            )
+        )
+    
+    Use the official OpenPI/OpenPI-client utilities corresponding to the audited path.
+    
+    Do not substitute:
 
-    Do not:
-
-    - average the 256 tokens;
-    - select a subset of patches;
-    - perform PCA;
-    - perform SVD;
-    - quantize features;
-    - compress feature dimensions;
-    - compute attention-weighted features.
-
-    Later analysis will derive frame-level vectors such as:
-
-    ```python
-    frame_feature = token_feature.mean(axis=0)
-    ```
-
-    from the saved full tensors.
-
+    - PIL.Image.resize;
+    - OpenCV resize;
+    - torchvision resize;
+    - custom image normalization;
+    - OpenVLA preprocessing;
+    - ImageNet normalization;
+    - custom orientation handling.
+    
+    The raw PilotObservation arrays must remain unmodified.
+    
     ---
-
-    # 12. Batching semantics — FROZEN
-
-    C2 may process multiple Pilot observations in one GPU batch.
-
-    Batching is only an implementation/runtime optimization.
-
-    It does not change the scientific sample unit.
-
-    Conceptually:
-
-    ```text
-    sample A
-    sample B
-    sample C
-        ↓
-    processor batch
-        ↓
-    [B, 6, 224, 224]
-        ↓
-    feature extraction
-        ↓
-    split by batch index
-        ↓
-    one feature record per original sample
-    ```
-
-    The mapping must remain exact:
-
-    ```text
-    feature[0] ↔ sample_id[0]
-    feature[1] ↔ sample_id[1]
-    ...
-    ```
-
-    Do not depend on unordered filesystem iteration.
-
+    
+    ## Official LIBERO Policy Input Reconstruction
+    
+    Only after client-side preprocessing construct:
+    
+        {
+            "observation/image": base_image,
+            "observation/wrist_image": wrist_image,
+            "observation/state": record.state,
+            "prompt": record.prompt,
+        }
+    
+    Do NOT construct the π0.5 policy dictionary directly from:
+    
+        record.base_rgb_raw
+        record.wrist_rgb_raw
+    
+    without the required official client preprocessing.
+    
     ---
-
-    ## 12.1 batch_size
-
-    Expose only a minimal runtime parameter:
-
-    ```python
-    batch_size: int = 1
-    ```
-
-    `batch_size` is not a scientific parameter.
-
-    It must not affect feature values except for normal deterministic floating-point execution behavior.
-
-    Do not introduce a dataloader framework or generalized batching abstraction for C2.
-
+    
+    ## DataConfig Construction
+    
+    Construct the pi05_libero data configuration using the existing TrainConfig boundary:
+    
+        data_config = train_config.data.create(
+            train_config.assets_dirs,
+            train_config.model,
+        )
+    
+    Do not reimplement the semantics of the data configuration.
+    
+    The resulting configuration should provide the official:
+    
+    - LIBERO input transforms;
+    - normalization mode;
+    - model transforms;
+    - asset identity.
+    
+    Validate that the resulting configuration is compatible with the frozen pi05_libero semantics.
+    
     ---
+    
+    ## Official Server-Side Transform Orchestration
+    
+    OpenPI does not expose a dedicated standalone helper whose sole purpose is C3 preprocessing.
+    
+    Therefore C3 is explicitly allowed to perform minimal transform orchestration using the existing official OpenPI transform objects.
+    
+    This is allowed:
+    
+        compose official transform objects
+        in create_trained_policy-compatible order
 
-    # 13. Public API
+    This is forbidden:
+    
+        reimplement individual transform algorithms
+    
+    The implementation should preserve the inference ordering semantics of the official policy construction for the current no-external-default-prompt case:
+    
+        InjectDefaultPrompt(None)
+            ↓
+        data_config.data_transforms.inputs
+            ↓
+        Normalize(
+            norm_stats,
+            use_quantiles=data_config.use_quantile_norm,
+        )
+            ↓
+        data_config.model_transforms.inputs
+    
+    Use existing OpenPI transform classes and composition utilities.
+    
+    Do not duplicate the implementations of:
+    
+    - LiberoInputs;
+    - Normalize;
+    - ResizeImages;
+    - TokenizePrompt;
+    - PadStatesAndActions;
+    - InjectDefaultPrompt.
 
-    Introduce a minimal public API conceptually equivalent to:
-
-    ```python
-    class OpenVLAFeatureExtractionError(RuntimeError):
-        ...
-
-
-    def extract_openvla_features(
-        *,
-        model,
-        processor,
-        pretrained_checkpoint: str | Path,
-        observation_paths: Sequence[str | Path],
-        output_dir: str | Path,
-        center_crop: bool = True,
-        batch_size: int = 1,
-    ) -> tuple[Path, ...]:
-        ...
-    ```
-
-    The exact spelling may change only if there is a concrete implementation reason identified during planning.
-
-    Do not expose parameters for:
-
-    - task suite;
-    - task ID;
-    - camera resolution;
-    - token pooling;
-    - selected layers;
-    - selected backbone;
-    - projector choice;
-    - dtype selection;
-    - feature dimensions;
-    - π0;
-    - CCA;
-    - attack configuration.
-
-    Those are frozen or outside C2.
-
+    Do not invoke full create_trained_policy merely to obtain preprocessing, because that would introduce inappropriate model/checkpoint loading into C3.
+    
     ---
-
-    # 14. Observation identity
-
-    Each input record must be loaded using:
-
-    ```python
-    PilotObservation.load(...)
-    ```
-
-    The exact `PilotObservation.sample_id` is the canonical feature identity.
-
-    Do not infer identity from input file ordering.
-
-    Do not generate a new UUID.
-
-    Do not renumber observations.
-
+    
+    ## Normalization Semantics
+    
+    PI05 uses:
+    
+        use_quantiles = True
+    
+    for the official pi05_libero configuration.
+    
+    The extractor must preserve the official:
+    
+        Normalize(
+            norm_stats,
+            use_quantiles=True,
+        )
+    
+    semantics.
+    
+    Normalize affects only input fields with matching norm-stat entries.
+    
+    Do not apply checkpoint normalization indiscriminately to all fields.
+    
+    Do not manually normalize RGB arrays here.
+    
+    The image model-range conversion occurs later through:
+    
+        Observation.from_dict(...)
+    
+    which converts uint8 RGB values from:
+    
+        [0, 255]
+    
+    to:
+    
+        float32 [-1, 1]
+    
     ---
-
-    # 15. Feature serialization — FROZEN
-
-    Serialize exactly one feature `.npz` per Pilot sample.
-
-    Recommended output filename:
-
-    ```text
-    {sample_id}.npz
-    ```
-
-    One file contains all three representations.
-
-    Required array keys:
-
-    ```text
-    o1_siglip
-    o1_fused
-    o2_projected
-    ```
-
-    Required metadata must contain at least:
-
-    ```text
-    sample_id
-    source_model = "openvla"
-    checkpoint
-    feature_schema_version
-    ```
-
-    Keep metadata minimal.
-
-    Do not duplicate the complete `PilotObservation` metadata.
-
-    The original observation remains the source of truth for:
-
-    - task;
-    - episode;
-    - step;
-    - prompt;
-    - success;
-    - raw images;
-    - state.
-
-    Feature ↔ observation pairing is:
-
-    ```text
-    feature.sample_id == PilotObservation.sample_id
-    ```
-
+    
+    ## Official Image-Slot Semantics
+    
+    After LiberoInputs for PI05, preserve exactly:
+    
+        base_0_rgb
+        left_wrist_0_rgb
+        right_wrist_0_rgb
+    
+    with:
+    
+        base_0_rgb        = real client-preprocessed base image
+        left_wrist_0_rgb  = real client-preprocessed wrist image
+        right_wrist_0_rgb = np.zeros_like(base_image)
+    
+    and masks:
+    
+        base_0_rgb        = True
+        left_wrist_0_rgb  = True
+        right_wrist_0_rgb = False
+    
+    The extractor must construct and validate the complete official image-slot semantics.
+    
+    Pilot v0.1 feature extraction uses only:
+    
+        observation.images["base_0_rgb"]
+    
+    for P1 and P2.
+    
+    Do not serialize wrist-camera representations.
+    
+    Do not use the dummy right-wrist slot for feature extraction.
+    
     ---
-
-    # 16. Serialization safety
-
-    Use a non-pickle NumPy serialization format.
-
-    Feature files must be loadable with:
-
-    ```python
-    np.load(path, allow_pickle=False)
-    ```
-
-    Do not store Python objects.
-
-    Do not silently overwrite an existing feature file.
-
-    Before writing a batch, validate all intended output paths for that batch.
-
-    A serialization/runtime error must be explicit.
-
-    Do not silently skip failed samples.
-
-    Do not substitute another Pilot observation.
-
+    
+    ## Per-Record Transform Boundary
+    
+    Official OpenPI transforms operate on unbatched per-record dictionaries.
+    
+    Therefore for every PilotObservation:
+    
+    1. load and validate the record;
+    2. compute provenance from raw base_rgb_raw;
+    3. perform official client preprocessing;
+    4. construct an independent policy dictionary;
+    5. apply the composed official server transform pipeline;
+    6. store the independently transformed result.
+    
+    Do not pass a pre-stacked batch through transforms that expect unbatched dictionaries.
+    
+    Do not reuse mutable nested dictionaries across records.
+    
+    Some transforms mutate input structures.
+    
     ---
-
-    # 17. Input validation
-
-    Fail explicitly for at least:
-
-    - empty observation list;
-    - duplicate input paths if they resolve to the same Pilot sample;
-    - duplicate `sample_id`;
-    - missing observation file;
-    - invalid `PilotObservation`;
-    - invalid `base_rgb_raw`;
-    - nonpositive/noninteger `batch_size`;
-    - incompatible model architecture;
-    - processor output without six visual channels;
-    - unexpected branch feature rank;
-    - unexpected token count;
-    - unexpected feature dimensions;
-    - output path collision;
-    - runtime preprocessing error;
-    - model forward error;
-    - serialization error.
-
-    For this frozen Pilot, expected token count is:
-
-    ```text
-    256
-    ```
-
-    Unexpected shapes should be treated as architecture/checkpoint mismatch, not silently accepted.
-
+    
+    ## Batching Boundary
+    
+    Only after all records in the current batch have independently passed through the official transform pipeline:
+    
+    1. stack equivalent leaves in original input order;
+    2. convert stacked values to JAX-compatible arrays;
+    3. construct the batched Observation.
+    
+    Batching must preserve:
+    
+    - sample order;
+    - sample identity;
+    - one-to-one provenance;
+    - one-to-one P1/P2 correspondence.
+    
+    Support:
+    
+        batch_size >= 1
+    
+    Default:
+    
+        batch_size = 1
+    
+    Do not introduce multiprocessing, distributed inference, or asynchronous extraction.
+    
     ---
-
-    # 18. Output ordering
-
-    The returned:
-
-    ```python
-    tuple[Path, ...]
-    ```
-
-    must correspond to the exact order of the input `observation_paths`.
-
-    Batching must not change output ordering.
-
+    
+    ## Observation Construction
+    
+    After stacking transformed records:
+    
+        batched_dict
+            ↓
+        convert leaves to jax.Array-compatible values
+            ↓
+        Observation.from_dict(batched_dict)
+    
+    Preserve the OpenPI inference semantics where image uint8 arrays become:
+    
+        float32 [-1, 1]
+    
+    Do not bypass Observation.from_dict with custom image conversion.
+    
+    Because Observation.from_dict may mutate nested image structures, each batch tree must be independently constructed.
+    
     ---
-
-    # 19. Files allowed
-
-    Prefer:
-
-    ```text
-    new:
-        shared_feature/openvla_features.py
-
-    new:
-        tests/test_openvla_features.py
-
-    minimal optional update:
+    
+    ## preprocess_observation
+    
+    After constructing the batched Observation, call:
+    
+        observation = preprocess_observation(
+            None,
+            observation,
+            train=False,
+        )
+    
+    Call this once on the batched Observation.
+    
+    Do not apply it independently to each record before batching.
+    
+    Do not introduce training-time random augmentation.
+    
+    For valid official inference images already at 224×224, image geometry is expected to remain unchanged, but this call remains part of the frozen inference path.
+    
+    ---
+    
+    ## Representation Extraction
+    
+    Use the real JAX/NNX π0.5 visual module directly.
+    
+    For:
+    
+        observation.images["base_0_rgb"]
+    
+    call:
+    
+        p2, aux = model.PaliGemma.img(
+            observation.images["base_0_rgb"],
+            train=False,
+        )
+    
+    then:
+    
+        p1 = aux["encoded"]
+    
+    No hooks.
+    
+    No OpenPI source modification.
+    
+    No duplicated SigLIP forward implementation.
+    
+    No standalone replacement vision encoder.
+    
+    No deeper Gemma or Action Expert extraction.
+    
+    ---
+    
+    ## P1 Definition
+    
+    P1 is:
+    
+        aux["encoded"]
+    
+    Semantics:
+    
+        π0.5 SigLIP So400m/14 encoder output
+        after final encoder normalization
+        before the 1152 → 2048 image projection
+    
+    Expected batched shape:
+    
+        [B, 256, 1152]
+    
+    Serialized per-sample shape:
+    
+        [256, 1152]
+    
+    Preserve all 256 tokens.
+    
+    No pooling.
+    
+    ---
+    
+    ## P2 Definition
+    
+    P2 is the first return value of:
+    
+        model.PaliGemma.img(...)
+    
+    Semantics:
+    
+        π0.5 PaliGemma-ready projected image tokens
+        after the SigLIP 1152 → 2048 projection
+        before deeper Gemma processing
+    
+    Expected batched shape:
+    
+        [B, 256, 2048]
+    
+    Serialized per-sample shape:
+    
+        [256, 2048]
+    
+    Preserve all 256 tokens.
+    
+    No pooling.
+    
+    ---
+    
+    ## JAX → NumPy Serialization Boundary
+    
+    For extracted JAX arrays use explicit device-to-host conversion semantics equivalent to:
+    
+        np.asarray(
+            jax.device_get(value),
+            dtype=np.float32,
+        )
+    
+    Do not rely on implicit device conversion during np.savez.
+    
+    Before writing each sample:
+    
+    - remove the batch dimension by indexing the correct sample;
+    - convert P1 to float32 NumPy;
+    - convert P2 to float32 NumPy;
+    - validate shapes and values.
+    
+    ---
+    
+    ## Serialization
+    
+    Write exactly one π0.5 feature archive per observation:
+    
+        {sample_id}.npz
+    
+    Each archive must contain exactly:
+    
+        p1_siglip
+        p2_projected
+        metadata_json
+    
+    Required arrays:
+    
+        p1_siglip
+            shape = (256, 1152)
+            dtype = float32
+        
+        p2_projected
+            shape = (256, 2048)
+            dtype = float32
+    
+    Before writing validate:
+    
+    - exact expected shape;
+    - finite values;
+    - non-empty arrays;
+    - not trivially all-zero.
+    
+    Do not serialize the complete SigLIP auxiliary dictionary.
+    
+    Use compressed NPZ consistent with the existing project convention.
+    
+    ---
+    
+    ## Provenance Metadata
+    
+    metadata_json must contain exactly:
+    
+        sample_id
+        source_model
+        checkpoint
+        feature_schema_version
+        source_image_hash
+    
+    Use:
+    
+        source_model = "pi05"
+    
+    and:
+    
+        feature_schema_version = "pi05_features_v1"
+    
+    `checkpoint` must preserve the caller-provided checkpoint identifier deterministically.
+    
+    Do not add:
+    
+        node_name
+    
+    Do not duplicate representation shape or dtype metadata in metadata_json.
+    
+    ---
+    
+    ## Error Handling
+    
+    Raise:
+    
+        Pi05FeatureExtractionError
+    
+    for extractor-level external-boundary failures.
+    
+    Appropriate wrapped boundaries include:
+    
+    - PilotObservation loading;
+    - OpenPI dependency loading;
+    - client preprocessing;
+    - transform construction;
+    - transform execution;
+    - model invocation;
+    - JAX device transfer;
+    - serialization.
+    
+    If a Pi05FeatureExtractionError is already raised internally, propagate it unchanged.
+    
+    For wrapped external exceptions preserve:
+    
+        __cause__
+    
+    using normal exception chaining.
+    
+    Fail loudly for:
+    
+    - invalid PilotObservation;
+    - malformed raw images;
+    - invalid canonical state;
+    - unsafe sample_id;
+    - duplicate input path;
+    - duplicate sample_id;
+    - output collision;
+    - incompatible TrainConfig;
+    - malformed norm_stats;
+    - missing required state norm stats;
+    - missing OpenPI preprocessing dependency;
+    - malformed image slots;
+    - unexpected image masks;
+    - batching mismatch;
+    - missing PaliGemma.img;
+    - missing aux["encoded"];
+    - unexpected P1 shape;
+    - unexpected P2 shape;
+    - non-finite output features.
+    
+    Do not silently skip bad samples.
+    
+    Do not broadly wrap obvious internal programmer errors if doing so would destroy useful diagnostics.
+    
+    ---
+    
+    ## Unit-Test Strategy
+    
+    Do not create one test function for every checklist item.
+    
+    Use a small number of focused tests that collectively validate the required behavior.
+    
+    Mocks/fakes should model only the necessary public behavior.
+    
+    Do not reimplement OpenPI in the tests.
+    
+    ### Unit-Level Behaviors to Verify
+    
+    Tests should collectively cover:
+    
+    1. PilotObservation loading and input-order preservation;
+    2. raw base/wrist images are not mutated;
+    3. canonical state validation:
+           shape == (8,)
+           numeric real dtype
+           finite values;
+    4. safe sample_id validation;
+    5. exact raw source_image_hash semantics;
+    6. 180° rotation for base and wrist images;
+    7. official resize_with_pad utility usage;
+    8. official convert_to_uint8 utility usage;
+    9. client preprocessing occurs before policy-dict construction;
+    10. policy dict receives processed base/wrist images;
+    11. correct DataConfig construction from TrainConfig;
+    12. explicit supplied norm_stats are used;
+    13. missing/malformed norm_stats fail;
+    14. official transform objects are composed in correct inference ordering;
+    15. transforms operate per record before batching;
+    16. mutable transformed dictionaries are independent;
+    17. PI05 camera slots and masks are correct;
+    18. right-wrist slot uses zero padding;
+    19. batching preserves order and identity;
+    20. Observation.from_dict is used after batching;
+    21. preprocess_observation(..., train=False) is applied to batched Observation;
+    22. only base_0_rgb is sent to the visual module;
+    23. model.PaliGemma.img is the extraction boundary;
+    24. P1 comes from aux["encoded"];
+    25. P2 comes from the first return value;
+    26. expected batch shape validation;
+    27. per-sample serialization shapes;
+    28. float32 NumPy output;
+    29. full 256-token preservation;
+    30. exact NPZ keys;
+    31. exact metadata fields;
+    32. duplicate path/sample rejection;
+    33. missing/invalid input rejection;
+    34. output collision rejection;
+    35. malformed model output rejection;
+    36. non-finite output rejection;
+    37. Pi05FeatureExtractionError chaining.
+    
+    ---
+    
+    ## Explicitly Deferred to Real C3 Smoke
+    
+    Unit tests must NOT claim to establish:
+    
+    - real pi05_libero checkpoint loading;
+    - actual released checkpoint backend;
+    - actual checkpoint norm-stat contents;
+    - actual checkpoint asset paths;
+    - real tokenizer numerical behavior;
+    - tokenizer asset downloading;
+    - real JAX/NNX runtime return structure;
+    - real model dtype behavior;
+    - real device placement;
+    - real sharding behavior;
+    - real P1/P2 numerical values;
+    - real P1/P2 shape confirmation against the released model;
+    - serialized-vs-direct numerical equality on the real model;
+    - complete real-policy transform numerical equivalence.
+    
+    These belong to the separate real C3 integration smoke.
+    
+    ---
+    
+    ## Integration Boundary
+    
+    Successful implementation and unit tests establish only:
+    
+        π0.5 representation extractor — unit-level PASS
+    
+    They do NOT establish:
+    
+        C3 fully closed
+    
+    A later real integration smoke must verify the released pi05_libero path end-to-end.
+    
+    Do not implement that smoke in this turn.
+    
+    ---
+    
+    ## Required Verification Before Completion
+    
+    Run at minimum:
+    
+        tests/test_pi05_features.py
+        tests/test_pilot_observation.py
+    
+    Also run existing relevant project tests if:
+    
         shared_feature/__init__.py
-    ```
-
+    
+    or other public exports are changed.
+    
+    Run Ruff on all changed Python files.
+    
+    Report:
+    
+    - files changed;
+    - implementation summary;
+    - exact test commands;
+    - test results;
+    - Ruff result;
+    - any OpenPI API assumptions discovered;
+    - any difference between contract expectations and actual local API;
+    - whether any file outside the allowed scope changed.
+    
+    ---
+    
+    ## Documentation
+    
     Do not modify:
-
-    ```text
-    shared_feature/pilot_observation.py
-    shared_feature/libero_collector.py
-    ```
-
-    unless planning identifies a genuine blocker.
-
-    If C2 appears to require modifying C1 production code, stop and explain why before implementation.
-
-    Do not create a generic feature framework.
-
+    
+        docs/pilot-v0.1-spec.md
+    
+    during normal implementation.
+    
+    The preprocessing scientific design has already been corrected and frozen.
+    
+    Only report a documentation blocker if the implementation discovers a genuine contradiction with the actual OpenPI source.
+    
+    Do not alter research decisions during coding.
+    
+    Do not mark full C3 PASS.
+    
+    Maximum allowed status after successful completion:
+    
+        π0.5 representation extractor — unit-level PASS
+        C3 real π0.5 integration smoke — PENDING
+    
     ---
-
-    # 20. Official/reference source boundaries
-
-    Relevant OpenVLA references include:
-
-    ```text
-    ../openvla/prismatic/extern/hf/modeling_prismatic.py
-    ../openvla/prismatic/extern/hf/processing_prismatic.py
-    ../openvla/experiments/robot/openvla_utils.py
-    ../openvla/experiments/robot/libero/libero_utils.py
-    ```
-
-    Relevant current-project references:
-
-    ```text
-    shared_feature/pilot_observation.py
-    shared_feature/libero_collector.py
-    ```
-
-    Use the loaded checkpoint's actual model/processor attributes as runtime truth.
-
-    Do not inspect or copy unrelated OpenVLA training code.
-
-    `../modified-tex3d` is not needed for normal C2 implementation unless a specific already-known preprocessing correctness question requires targeted confirmation.
-
-    ---
-
-    # 21. Unit tests
-
-    Tests must be CPU-only and use minimal fakes/stubs.
-
-    Do not require a real 7B checkpoint for unit tests.
-
-    At minimum cover:
-
-    1. deterministic one-to-one `sample_id` mapping;
-
-    2. input observation order is preserved through batching;
-
-    3. duplicate `sample_id` is rejected;
-
-    4. existing output collision is rejected without overwrite;
-
-    5. C1-compatible preprocessing path is invoked with the frozen 512 → 224 behavior;
-
-    6. center-crop behavior is invoked when `center_crop=True`;
-
-    7. checkpoint processor output is used for visual tensors;
-
-    8. six-channel processor output is split exactly:
-       - channels 0:3 → DINO;
-       - channels 3:6 → SigLIP;
-
-    9. DINO branch is evaluated exactly once per batch;
-
-    10. SigLIP branch is evaluated exactly once per batch;
-
-    11. fused representation equals:
-        ```python
-        torch.cat([dino_feature, siglip_feature], dim=-1)
-        ```
-
-    12. projector receives exactly O1-F;
-
-    13. full token dimension is retained;
-
-    14. no mean pooling occurs;
-
-    15. batch dimension is removed during per-sample serialization;
-
-    16. persisted arrays are FP32;
-
-    17. expected output shapes are enforced:
-        ```text
-        O1-S = [256, 1152]
-        O1-F = [256, 2176]
-        O2   = [256, 4096]
-        ```
-
-    18. malformed six-channel processor output is rejected;
-
-    19. malformed feature shapes are rejected;
-
-    20. runtime/model exception is converted to
-        `OpenVLAFeatureExtractionError`
-        with the original exception preserved as the cause;
-
-    21. every generated `.npz` loads with:
-        ```python
-        np.load(..., allow_pickle=False)
-        ```
-
-    22. metadata contains the correct `sample_id`, source model, checkpoint, and schema version.
-
-    Keep tests focused on the frozen C2 contract.
-
-    Do not create a generalized fake VLA framework.
-
-    ---
-
-    # 22. Real C2 smoke test — NOT part of the first implementation turn
-
-    After unit implementation is reviewed, a separate real smoke integration will verify the extractor using:
-
-    - the real C1 smoke observations;
-    - the same OpenVLA checkpoint used by C1;
-    - real BF16 OpenVLA on GPU.
-
-    Do not run this real smoke until explicitly authorized.
-
-    The real smoke must eventually verify:
-
-    ```text
-    C2 reconstructed pixel_values
-    ==
-    normal C1/OpenVLA policy preprocessing pixel_values
-    ```
-
-    for at least one known Pilot sample, ideally with exact equality or a reported zero/max absolute difference.
-
-    It must also verify real feature shapes:
-
-    ```text
-    O1-S = [256,1152]
-    O1-F = [256,2176]
-    O2   = [256,4096]
-    ```
-
-    and confirm all serialized arrays are FP32 CPU NumPy arrays.
-
-    ---
-
-    # 23. Explicitly forbidden in C2
-
-    Do not implement:
-
-    - π0 feature extraction;
-    - π0 preprocessing;
-    - DINO/SigLIP hooks;
-    - model-source modifications;
-    - language-model hidden-state extraction;
-    - action-token extraction;
-    - mean pooling;
-    - PCA/SVD;
-    - CCA;
-    - CKA;
-    - regression;
-    - shuffled baselines;
-    - train/held-out split logic;
-    - feature-space attack loss;
-    - Tex3D attack integration;
-    - differentiable rendering;
-    - model ensembles;
-    - manifest/index framework;
-    - multiprocessing;
-    - distributed extraction;
-    - generalized experiment configuration.
-
-    Stop when C2 is complete.
-
-    ---
-
-    # 24. First Codex response — planning only
-
-    For the first turn after this contract is installed:
-
-    **Do not modify files.**
-
-    Read:
-
-    ```text
-    AGENTS.md
-    docs/research-map.md
-    docs/pilot-v0.1-spec.md
-    task.md
-    shared_feature/pilot_observation.py
-    shared_feature/libero_collector.py
-    ```
-
-    Then inspect only the OpenVLA source files necessary to verify this contract.
-
-    Return a minimal read-only implementation plan containing:
-
-    1. exact files to create or modify;
-
-    2. proposed public API;
-
-    3. exact OpenVLA model attributes to call for:
-       - DINO;
-       - SigLIP;
-       - fused representation;
-       - projector;
-
-    4. exact preprocessing path from:
-       ```text
-       PilotObservation.base_rgb_raw
-       ```
-       to:
-       ```text
-       pixel_values
-       ```
-
-    5. how C1 preprocessing equivalence will be preserved without modifying C1;
-
-    6. how the checkpoint processor's six-channel tensor will be split;
-
-    7. how device/dtype will be inferred from the loaded model;
-
-    8. how batching preserves exact `sample_id` ordering;
-
-    9. exact NPZ layout and metadata representation;
-
-    10. focused CPU tests;
-
-    11. every assumption not explicitly frozen by this contract;
-
-    12. every conflict found between:
-        - this contract;
-        - current C1 implementation;
-        - OpenVLA source behavior.
-
-    Do not implement anything in that first response.
-
-    Do not start π0/C3.
-
-    Stop after the plan.
+    
+    ## Stop Condition
+    
+    Stop when:
+    
+    1. raw PilotObservation inputs are validated;
+    2. official client-side LIBERO preprocessing is reproduced;
+    3. checkpoint-associated explicit norm_stats are used;
+    4. official pi05_libero server-side transforms are orchestrated from existing OpenPI objects;
+    5. transforms run per record before batching;
+    6. batched Observation construction matches official inference semantics;
+    7. batched preprocess_observation(train=False) is preserved;
+    8. P1/P2 are extracted through model.PaliGemma.img;
+    9. provenance and serialization match the frozen schema;
+    10. focused unit tests pass;
+    11. relevant existing tests remain green;
+    12. Ruff passes;
+    13. no forbidden scope was touched.
+    
+    If any requirement cannot be satisfied without:
+    
+    - modifying upstream OpenPI;
+    - changing the frozen scientific semantics;
+    - downloading the full checkpoint inside the extractor;
+    - inventing or silently substituting normalization statistics;
+    - bypassing required official preprocessing;
+    - duplicating OpenPI transform algorithms;
+    - duplicating SigLIP internals;
+    
+    STOP and report the blocker rather than expanding scope.
