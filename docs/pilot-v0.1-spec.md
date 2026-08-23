@@ -508,7 +508,9 @@ base_0_rgb
 
 ### DECISION
 
-C3 必须从现有 `PilotObservation` 重建官方 `pi05_libero` inference input。
+C3 必须从现有 `PilotObservation` 重建官方 `pi05_libero` inference input，并复现官方 OpenPI LIBERO inference path 中与视觉输入相关的 client-side 与 server-side preprocessing。
+
+`PilotObservation` 保存的是未经 π0.5-specific preprocessing 的原始 LIBERO observation。
 
 输入字段为：
 
@@ -519,27 +521,106 @@ PilotObservation.state
 PilotObservation.prompt
 ```
 
-重建为：
+---
+
+### Official LIBERO Client-Side Image Preprocessing
+
+### FACT
+
+OpenPI 官方 LIBERO client 在构造 policy input dictionary 之前，会先对 base image 和 wrist image 执行：
+
+```text
+raw LIBERO image
+        ↓
+180° rotation
+        ↓
+np.ascontiguousarray
+        ↓
+openpi_client.image_tools.resize_with_pad(224, 224)
+        ↓
+convert_to_uint8
+```
+
+其中 180° rotation 对应：
+
+```python
+image[::-1, ::-1]
+```
+
+该旋转属于官方 LIBERO inference preprocessing，用于匹配模型训练时的图像方向。
+
+因此 C3 必须从原始 `PilotObservation` 图像执行等价的官方 client-side preprocessing：
+
+```python
+base_image = np.ascontiguousarray(
+    record.base_rgb_raw[::-1, ::-1]
+)
+
+wrist_image = np.ascontiguousarray(
+    record.wrist_rgb_raw[::-1, ::-1]
+)
+
+base_image = image_tools.convert_to_uint8(
+    image_tools.resize_with_pad(base_image, 224, 224)
+)
+
+wrist_image = image_tools.convert_to_uint8(
+    image_tools.resize_with_pad(wrist_image, 224, 224)
+)
+```
+
+这里的 rotation / resize / uint8 conversion 不是自定义 preprocessing，而是官方 OpenPI LIBERO client inference boundary 的一部分。
+
+不得将该步骤省略，也不得用其他 resize / orientation handling 替代。
+
+---
+
+### Official LIBERO Policy Input Reconstruction
+
+完成官方 client-side preprocessing 后，C3 重建 policy input dictionary：
 
 ```python
 {
-    "observation/image": record.base_rgb_raw,
-    "observation/wrist_image": record.wrist_rgb_raw,
+    "observation/image": base_image,
+    "observation/wrist_image": wrist_image,
     "observation/state": record.state,
     "prompt": record.prompt,
 }
 ```
 
-C3 必须复用 OpenPI 官方 `pi05_libero` input transforms。
+注意：
 
-禁止实现独立的手工图像 preprocessing 来替代官方 transform pipeline。
+```text
+record.base_rgb_raw
+record.wrist_rgb_raw
+```
+
+仍然保持原始状态。
+
+C3 不得原地修改 `PilotObservation` 中保存的 raw image arrays。
+
+---
+
+### Official Server-Side OpenPI Transforms
+
+构造 policy input dictionary 后，C3 必须继续复用 `pi05_libero` 对应的官方 OpenPI inference transforms。
 
 主要 inference preprocessing 路径为：
 
 ```text
 PilotObservation
         ↓
-construct LIBERO inference dict
+raw base_rgb_raw / wrist_rgb_raw
+        ↓
+official LIBERO client preprocessing
+        ├── rotate 180°
+        ├── np.ascontiguousarray
+        ├── resize_with_pad(224, 224)
+        └── convert_to_uint8
+        ↓
+construct LIBERO policy input dict
+        ↓
+InjectDefaultPrompt
         ↓
 LiberoInputs(model_type=PI05)
         ↓
@@ -553,18 +634,25 @@ image masks:
     True
     False
         ↓
-checkpoint normalization pipeline
+checkpoint normalization
+(use_quantiles=True for PI05)
         ↓
-ResizeImages(224, 224)
-using OpenPI resize_with_pad
+model transforms
+        ├── InjectDefaultPrompt(None)
+        ├── ResizeImages(224, 224)
+        ├── TokenizePrompt(
+        │       max_token_len=200,
+        │       discrete_state_input=False,
+        │   )
+        └── PadStatesAndActions(32)
         ↓
-TokenizePrompt
+add batch dimension
         ↓
-PadStatesAndActions
+convert to JAX arrays
         ↓
-Observation.from_dict
+Observation.from_dict(...)
         ↓
-uint8 image
+uint8 images
 → float32
 → [-1, 1]
         ↓
@@ -577,26 +665,161 @@ preprocess_observation(
 observation.images["base_0_rgb"]
 ```
 
-`preprocess_observation(..., train=False)` 属于真实 π0.5 inference path，因此 C3 保留该调用。
+---
 
-由于 model transforms 已经将图像 resize 至 `224 × 224`，正常情况下该步骤不会再次改变 image geometry，也不会在 inference 时施加随机 augmentation。
+### Checkpoint Normalization Semantics
 
-C3 不允许使用：
+### FACT
+
+`Normalize(...)` does not apply one global normalization rule to every input field.
+
+It only transforms fields for which checkpoint normalization statistics are available.
+
+For the official LIBERO assets, normalization statistics are expected to apply to robot state / action fields rather than RGB images.
+
+During inference:
+
+```text
+state
+```
+
+is normalized using the checkpoint statistics.
+
+The RGB images are not normalized by the checkpoint normalization transform.
+
+Their model-range conversion occurs later in:
+
+```text
+Observation.from_dict(...)
+```
+
+where uint8 image values are mapped from:
+
+```text
+[0, 255]
+```
+
+to:
+
+```text
+[-1, 1] float32
+```
+
+---
+
+### Resize Semantics
+
+The official LIBERO client already performs:
+
+```text
+resize_with_pad(224, 224)
+```
+
+before constructing the policy input dictionary.
+
+The server-side model transform still includes:
+
+```text
+ResizeImages(224, 224)
+```
+
+using the OpenPI `resize_with_pad` implementation.
+
+Because the official client-side images are already `224 × 224`, the server-side resize is expected to preserve image geometry under the normal inference path.
+
+C3 must retain both boundaries rather than removing the server-side transform based on this expected no-op behavior.
+
+---
+
+### `preprocess_observation` Semantics
+
+`preprocess_observation(..., train=False)` belongs to the real π0.5 model inference path and must therefore be preserved by C3.
+
+For a valid official inference observation whose images are already `224 × 224`:
+
+- no random image augmentation is applied；
+- no training-time random crop / rotation / color jitter is applied；
+- image resizing is expected to be unnecessary；
+- image masks and required image-slot semantics are still validated / normalized by the model preprocessing path。
+
+Therefore this step should remain part of the C3 reconstruction even when it is expected to be image-value-neutral for already valid `224 × 224` inputs.
+
+---
+
+### Forbidden Manual Replacements
+
+C3 不允许使用以下方式替代官方 OpenPI preprocessing：
 
 - PIL manual resize；
 - ImageNet mean/std normalization；
 - OpenVLA preprocessing；
 - 自行实现的 SigLIP image normalization；
+- 自定义图像方向修正；
+- 非 OpenPI 的 resize implementation；
+- 跳过官方 180° LIBERO rotation；
+- 直接把未旋转的 `PilotObservation.base_rgb_raw` 作为 π0.5 policy image。
 
-来替代官方 OpenPI preprocessing。
+---
 
-OpenVLA 与 π0.5 必须从相同的原始：
+### Cross-Model Raw-Observation Identity
+
+OpenVLA 与 π0.5 必须继续从相同的原始：
 
 ```text
 PilotObservation.base_rgb_raw
 ```
 
-独立执行各自 native preprocessing。
+开始各自的 native preprocessing。
+
+即：
+
+```text
+same raw external observation
+        │
+        ├── OpenVLA native preprocessing
+        │
+        └── π0.5 native preprocessing
+                ├── official 180° LIBERO rotation
+                ├── official resize_with_pad
+                ├── official OpenPI transforms
+                └── π0.5 visual encoding
+```
+
+π0.5-specific rotation 不改变 Pilot 的 cross-model identity 定义。
+
+因此：
+
+```text
+source_image_hash
+```
+
+仍然必须针对未经任何 model-specific preprocessing 的原始：
+
+```text
+PilotObservation.base_rgb_raw
+```
+
+计算。
+
+不得对以下内容重新定义 cross-model pairing hash：
+
+- 180° rotated image；
+- `resize_with_pad` 后 image；
+- `base_0_rgb`；
+- `Observation.images["base_0_rgb"]`；
+- SigLIP input tensor。
+
+Pilot 的 pairing identity 继续定义为：
+
+```text
+same raw external observation
+```
+
+而不是：
+
+```text
+same model-specific preprocessed tensor
+```
 
 ---
 
