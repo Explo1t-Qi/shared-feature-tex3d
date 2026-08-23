@@ -1,654 +1,968 @@
-- # Current Coding Contract — C1 LIBERO Observation Collector
+- - # C2 Contract — OpenVLA Representation Extractor
 
-  This file defines the only implementation task authorized for the current Codex session.
+    ## 0. Status
 
-  Read first:
+    **Current coding milestone:** C2 — OpenVLA Representation Extractor
 
-  1. `AGENTS.md`
-  2. `docs/research-map.md`
-  3. `docs/pilot-v0.1-spec.md`
-  4. `shared_feature/pilot_observation.py`
-  5. this file
+    Prerequisites:
 
-  Reference repositories:
+    - C0 `PilotObservation` schema: **PASS**
+    - C1 LIBERO observation collector: **PASS**
+    - C1 real OpenVLA/LIBERO smoke integration: **PASS**
 
-  - Current writable project: `.`
-  - Official Tex3D reference: `../tex3d`
-  - Historical modified Tex3D reference: `../modified-tex3d`
+    C2 operates only on the observations produced by C1.
 
-  For implementation behavior, prefer the frozen decisions in this contract.
+    C2 does **not** implement π0 extraction, shared-space discovery, PCA, CCA, CKA, regression, attack optimization, or Tex3D modifications.
 
-  Do not broadly copy code from `modified-tex3d`.
-  It may only be consulted for already identified collector-relevant correctness behavior.
+    ---
 
-  ---
+    # 1. Goal
 
-  ## Goal
+    Implement a minimal OpenVLA representation extractor that:
 
-  Implement a minimal LIBERO rollout observation collector for Pilot v0.1.
+    1. loads existing `PilotObservation` records;
+    2. reconstructs the exact OpenVLA policy-query visual preprocessing used by C1;
+    3. obtains the checkpoint processor's fused DINOv2 + SigLIP `pixel_values`;
+    4. directly calls existing OpenVLA vision submodules;
+    5. extracts and serializes three full token-level representations:
+       - O1-S: OpenVLA SigLIP branch feature;
+       - O1-F: fused DINOv2 + SigLIP feature;
+       - O2: OpenVLA multimodal projector output;
+    6. preserves one-to-one identity with the original Pilot `sample_id`.
 
-  The collector must:
+    The extractor must not modify OpenVLA source code and must not use forward hooks.
 
-  1. execute OpenVLA-driven LIBERO rollouts for the frozen Pilot task;
-  2. use fixed official LIBERO initial states;
-  3. capture raw observations before model-specific image preprocessing;
-  4. retain only valid-policy observations after the stabilization phase;
-  5. complete the episode before choosing samples;
-  6. uniformly select exactly 20 valid-policy frames per valid episode;
-  7. serialize those frames as `PilotObservation` records.
+    ---
 
-  This task is only about observation collection.
+    # 2. Scientific scope
 
-  ---
+    C2 answers only:
 
-  ## Frozen Pilot Configuration
+    > For each C1 policy-query observation, what visual representations does the real OpenVLA visual pipeline produce at the selected internal nodes?
 
-  Use:
+    C2 does **not** yet answer:
 
-  ```text
-  task_suite = libero_spatial
-  task_id = 2
-  ```
+    - whether these features are shared with π0;
+    - whether they are transferable;
+    - whether they are policy-relevant;
+    - whether mean pooling is appropriate;
+    - whether a shared subspace exists.
 
-  The task is:
+    Those are later milestones.
 
-  ```text
-  pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate
-  ```
+    ---
 
-  Use official LIBERO initial states with indices:
+    # 3. Frozen OpenVLA representation nodes
 
-  ```text
-  0 ... 9
-  ```
+    For the current fused OpenVLA visual backbone:
 
-  One initial state corresponds to one episode.
+    ```text
+    policy image
+        ↓
+    PrismaticProcessor
+        ↓
+    pixel_values [B, 6, 224, 224]
+        ↓
+    split channels
+     ┌────────────────┬─────────────────┐
+     │ first 3 ch     │ last 3 ch       │
+     │ DINO input     │ SigLIP input    │
+     ↓                ↓
+    DINOv2          SigLIP
+                       │
+                       └──────────── O1-S
+            │           │
+            └─ concat ──┘
+                  ↓
+                 O1-F
+                  ↓
+              projector
+                  ↓
+                  O2
+    ```
 
-  Do not substitute a different task or initial state automatically.
+    ## 3.1 O1-S
 
-  ---
+    Definition:
 
-  ## Allowed Scope
+    ```text
+    O1-S = output of OpenVLA's actual SigLIP branch featurizer
+    ```
 
-  Implement only the collector and focused tests required for this contract.
+    Expected Pilot shape per sample:
 
-  You may:
+    ```text
+    [256, 1152]
+    ```
 
-  - add one collector production module;
-  - add or modify focused collector tests;
-  - minimally export the collector API from `shared_feature/__init__.py` if needed.
+    This is the representation actually used by the OpenVLA fused visual backbone.
 
-  Default maximum:
+    Do not replace it with a separately instantiated SigLIP model.
 
-  - 1 new production module;
-  - 1 collector test module;
-  - minimal `__init__.py` update if required.
+    Do not change its layer.
 
-  If more production files are genuinely necessary, stop before broadening the implementation and explain why.
+    The OpenVLA featurizer is already configured so its forward path returns the actual second-to-last transformer-layer patch representation used by OpenVLA.
 
-  ---
+    ---
 
-  ## Forbidden Scope
+    ## 3.2 O1-F
 
-  Do NOT implement:
+    Definition:
 
-  - OpenVLA feature extraction;
-  - pi0/openpi feature extraction;
-  - train / held-out split generation;
-  - feature serialization;
-  - PCA / SVD / CCA / CKA;
-  - regression analysis;
-  - manifest/index infrastructure;
-  - Tex3D attack logic;
-  - differentiable renderer integration;
-  - shared-feature losses;
-  - object-region sampling;
-  - token-level analysis;
-  - model preprocessing abstractions;
-  - unrelated refactors.
+    ```text
+    O1-F = concat(DINOv2 feature, SigLIP feature, dim=-1)
+    ```
 
-  Do not copy abandoned spectral code from `modified-tex3d`.
+    Expected Pilot shape per sample:
 
-  ---
+    ```text
+    [256, 2176]
+    ```
 
-  ## Official Rollout Semantics
+    This is exactly the full visual feature passed into the OpenVLA multimodal projector.
 
-  Use the official Tex3D/OpenVLA LIBERO rollout path as the behavioral reference for:
+    O1-F is the primary OpenVLA **pre-projector visual representation**.
 
-  - LIBERO task loading;
-  - official initial-state retrieval;
-  - environment construction;
-  - OpenVLA policy execution;
-  - action postprocessing;
-  - environment stepping.
+    ---
 
-  Relevant reference files include:
+    ## 3.3 O2
 
-  ```text
-  ../tex3d/openvla/experiments/robot/libero/attack_openvla.py
-  ../tex3d/openvla/experiments/robot/libero/libero_utils.py
-  ../tex3d/openvla/experiments/robot/robot_utils.py
-  ../tex3d/openvla/experiments/robot/openvla_utils.py
-  ```
+    Definition:
 
-  Do not import the official attack pipeline wholesale.
+    ```text
+    O2 = model.projector(O1-F)
+    ```
 
-  Extract only the minimum behavior needed for a clean observation collector.
+    Expected Pilot shape per sample:
 
-  ---
+    ```text
+    [256, 4096]
+    ```
 
-  ## Raw Observation Boundary
+    O2 is OpenVLA's VLA-adapted visual representation immediately after the multimodal projector and before insertion into the language-model input sequence.
 
-  The collector must save observations directly from real LIBERO / MuJoCo environment outputs.
+    ---
 
-  Raw observations originate from:
+    # 4. Extraction method — FROZEN
 
-  ```text
-  env.set_init_state(...)
-  env.step(...)
-  ```
+    Use **direct calls to existing OpenVLA submodules**.
 
-  Images must be copied before any call equivalent to:
+    Do not use hooks.
 
-  ```text
-  get_libero_image(...)
-  ```
+    Do not modify OpenVLA model source.
 
-  or any OpenVLA-specific:
+    Do not run the full language model or `predict_action()` merely to obtain features.
 
-  - rotation;
-  - resize;
-  - JPEG encode/decode;
-  - crop;
-  - PIL conversion;
-  - processor transform;
-  - normalization.
+    Conceptually:
 
-  Required raw observation keys:
+    ```python
+    dino_pixels, siglip_pixels = torch.split(
+        pixel_values,
+        [3, 3],
+        dim=1,
+    )
 
-  ```text
-  agentview_image
-  robot0_eye_in_hand_image
-  robot0_eef_pos
-  robot0_eef_quat
-  robot0_gripper_qpos
-  ```
+    dino_feature = model.vision_backbone.featurizer(
+        dino_pixels
+    )
 
-  Missing required keys must cause an explicit collection error.
+    siglip_feature = model.vision_backbone.fused_featurizer(
+        siglip_pixels
+    )
 
-  Do not use differentiable-renderer or composited attack images as public Pilot observations.
+    fused_feature = torch.cat(
+        [dino_feature, siglip_feature],
+        dim=-1,
+    )
 
-  ---
+    projected_feature = model.projector(
+        fused_feature
+    )
+    ```
 
-  ## Canonical State
+    The implementation must reuse these already-loaded checkpoint modules.
 
-  `PilotObservation.state` must store the canonical 8D LIBERO policy state:
+    Each DINO/SigLIP branch should be evaluated only once per batch.
 
-  ```text
-  [
-      robot0_eef_pos,
-      quat_to_axis_angle(robot0_eef_quat),
-      robot0_gripper_qpos,
-  ]
-  ```
+    Do not call:
 
-  Conceptually:
+    ```python
+    model.vision_backbone(pixel_values)
+    ```
 
-  ```text
-  3D end-effector position
-  +
-  3D axis-angle orientation
-  +
-  2D gripper state
-  =
-  8D policy state
-  ```
+    after separately calling both branch featurizers, because that would recompute the same features.
 
-  This is a deterministic policy-level representation derived from raw LIBERO proprioception.
+    ---
 
-  It is intentionally shared by OpenVLA and pi0 LIBERO inference.
+    # 5. Input source — FROZEN
 
-  Do not store an arbitrary simulator state vector in this field.
+    C2 consumes serialized C1 `PilotObservation` records.
 
-  ---
+    For OpenVLA C2:
 
-  ## Stabilization / Dummy Phase
+    ```text
+    use:
+        PilotObservation.base_rgb_raw
 
-  Before policy execution, run exactly:
+    do not use:
+        PilotObservation.wrist_rgb_raw
+    ```
 
-  ```text
-  10 dummy environment steps
-  ```
+    Classic OpenVLA LIBERO policy uses the base/agent-view image only.
 
-  with action:
+    `state` is not an OpenVLA visual backbone input and must not affect O1-S/O1-F/O2 extraction.
 
-  ```text
-  [0, 0, 0, 0, 0, 0, -1]
-  ```
+    The saved state and wrist image remain part of the Pilot observation dataset for later π0 and policy-level work.
 
-  Dummy observations are not Pilot samples.
+    ---
 
-  The observation returned by the 10th dummy step becomes:
+    # 6. OpenVLA preprocessing semantics — FROZEN
 
-  ```text
-  valid-policy step_id = 0
-  ```
+    C2 must reproduce the **actual C1 OpenVLA policy-query preprocessing**, not invent a new preprocessing path.
 
-  If the environment terminates or reports task success during the dummy phase:
+    The scientific requirement is:
 
-  - treat the episode as invalid;
-  - report a collection error;
-  - do not serialize it as an ordinary success or failure;
-  - do not automatically replace the initial state.
+    ```text
+    C2 feature input
+    ==
+    C1 rollout OpenVLA policy input
+    ```
 
-  ---
+    C2 must not feed `base_rgb_raw` directly into the Hugging Face processor.
 
-  ## Valid-Policy Step Semantics
+    ---
 
-  `step_id` is:
+    ## 6.1 C1-compatible policy-image construction
 
-  ```text
-  0-based valid-policy observation index
-  ```
+    Starting from:
 
-  Dummy/stabilization steps do not count toward `step_id`.
+    ```python
+    record.base_rgb_raw
+    ```
 
-  Example:
+    reproduce the C1 path:
 
-  ```text
-  10 dummy steps
-  ↓
-  obs after final dummy step -> step_id 0
-  ↓
-  policy action
-  ↓
-  next obs -> step_id 1
-  ```
+    ```text
+    raw 512×512 agent-view observation
+        ↓
+    official get_libero_image(..., 512)
+        ↓
+    180° LIBERO rotation
+        ↓
+    JPEG encode/decode
+        ↓
+    C1 resize behavior
+        ↓
+    PIL resize to OpenVLA input size 224×224
+        ↓
+    OpenVLA center crop behavior
+        ↓
+    checkpoint processor
+    ```
 
-  Do not use the absolute environment-step count as `PilotObservation.step_id`.
+    C2 must preserve the currently validated C1 behavior even though upstream OpenVLA's standalone LIBERO evaluation path has a slightly different resize sequence.
 
-  ---
+    Do not silently replace the C1 path with upstream:
 
-  ## Episode Success Semantics
+    ```text
+    get_libero_image(..., 224)
+    ```
 
-  `PilotObservation.episode_success` means:
+    during C2.
 
-  ```text
-  LIBERO task success condition
-  ```
+    That baseline difference is a separate provenance/correctness note and is not a C2 change.
 
-  Use:
+    ---
 
-  ```text
-  env.check_success()
-  ```
+    ## 6.2 Center crop
 
-  or the equivalent public LIBERO success-check interface.
+    For the current Pilot checkpoint:
 
-  Do not use `done` as the sole definition of task success.
+    ```text
+    center_crop = True
+    crop_scale = 0.9
+    ```
 
-  `done` may be used to control rollout termination.
+    Use the same OpenVLA center-crop semantics already used by the real C1 rollout.
 
-  Normal outcomes:
+    Reuse existing official OpenVLA preprocessing helpers where possible.
 
-  ```text
-  task success detected
-  → episode_success = True
+    Do not independently invent a numerically different crop implementation.
 
-  normal rollout reaches its allowed limit without task success
-  → episode_success = False
-  ```
+    ---
 
-  A runtime/environment/policy exception is not a normal failure:
+    ## 6.3 Prompt / processor path
 
-  ```text
-  exception
-  → collection error
-  → do not silently serialize the episode as failure
-  ```
+    Use the checkpoint's existing `PrismaticProcessor`.
 
-  ---
+    The processor must be the processor corresponding to the same OpenVLA checkpoint used during C1.
 
-  ## Full Episode First, Sampling Second
+    Use the Pilot record's exact:
 
-  Do not decide the 20 Pilot frames online.
+    ```python
+    record.prompt
+    ```
 
-  For each episode:
+    when reconstructing the OpenVLA action prompt.
 
-  ```text
-  run full valid-policy trajectory
-  ↓
-  retain valid-policy raw observations in memory
-  ↓
-  episode finishes
-  ↓
-  know trajectory length T
-  ↓
-  select 20 observations deterministically
-  ↓
-  serialize selected observations
-  ```
+    Prompt formatting must follow the same OpenVLA checkpoint-dependent logic used by the official OpenVLA action path.
 
-  This Pilot is intentionally small, so a simple in-memory episode buffer is preferred over streaming infrastructure.
+    C2 needs only:
 
-  ---
+    ```python
+    inputs["pixel_values"]
+    ```
 
-  ## Uniform Sampling
+    and must not run language-model inference.
 
-  For a valid-policy trajectory with length:
+    ---
 
-  ```text
-  T
-  ```
+    # 7. Fused processor semantics — FROZEN
 
-  select exactly 20 deterministic indices spanning:
+    The checkpoint processor produces:
 
-  ```text
-  0 ... T - 1
-  ```
+    ```text
+    pixel_values: [B, 6, 224, 224]
+    ```
 
-  Use behavior equivalent to:
+    For the frozen `dinosiglip` backbone ordering:
 
-  ```python
-  np.linspace(0, T - 1, num=20)
-  ```
+    ```text
+    pixel_values[:, 0:3]
+        = DINOv2-preprocessed RGB tensor
 
-  followed by a deterministic integer conversion that yields 20 valid monotonically ordered indices.
+    pixel_values[:, 3:6]
+        = SigLIP-preprocessed RGB tensor
+    ```
 
-  The implementation must ensure the selected indices are unique.
+    These two 3-channel tensors may use different backbone-specific normalization / transform parameters.
 
-  Do not randomly sample frames.
+    Therefore do **not** reuse the first three channels for both models.
 
-  Do not duplicate observations to reach 20 samples.
+    Do not manually reproduce DINO/SigLIP normalization.
 
-  If:
+    Use the checkpoint processor output directly.
 
-  ```text
-  T < 20
-  ```
+    Explicitly validate:
 
-  treat the episode as invalid for Pilot collection and report an explicit error.
+    ```text
+    pixel_values.ndim == 4
+    pixel_values.shape[1] == 6
+    ```
 
-  ---
+    before feature extraction.
 
-  ## Normalized Episode Progress
+    ---
 
-  For every selected observation with original valid-policy `step_id = i`:
+    # 8. Model compatibility validation
 
-  ```text
-  normalized_episode_progress = i / (T - 1)
-  ```
+    C2 is Pilot-specific and should fail explicitly if the loaded model is incompatible with the frozen OpenVLA architecture.
 
-  where:
+    At minimum verify that the model exposes:
 
-  ```text
-  T
-  ```
+    ```text
+    model.vision_backbone
+    model.vision_backbone.featurizer
+    model.vision_backbone.fused_featurizer
+    model.projector
+    ```
 
-  is the full number of valid-policy observations in that episode.
+    and that the processor yields a six-channel fused visual input.
 
-  Do not renumber the selected 20 frames to `0...19`.
+    Do not silently adapt to a single-backbone OpenVLA checkpoint.
 
-  The saved `step_id` must remain the original valid-policy trajectory index.
+    Do not introduce a generic VLA/backbone registry.
 
-  ---
+    ---
 
-  ## Sample ID
+    # 9. Compute dtype and device — FROZEN
 
-  Generate `sample_id` deterministically as:
+    The current OpenVLA Pilot checkpoint is loaded for normal BF16 inference.
 
-  ```text
-  {suite}__task{task_id:02d}__state{initial_state_id:02d}__step{step_id:04d}
-  ```
+    Feature extraction must preserve the loaded OpenVLA inference semantics.
 
-  Example:
+    Do not convert the entire model to FP32 for C2.
 
-  ```text
-  libero_spatial__task02__state03__step0047
-  ```
+    Do not reload the backbone separately.
 
-  The same:
+    Use:
 
-  ```text
-  suite
-  task_id
-  initial_state_id
-  step_id
-  ```
+    ```text
+    existing loaded model
+    existing model device
+    existing vision-model dtype
+    ```
 
-  must always generate the same `sample_id`.
+    for computation.
 
-  Do not use:
+    The extractor may determine the appropriate device/dtype from the loaded vision backbone parameters.
 
-  - filesystem order;
-  - selected-frame ordinal;
-  - random UUID;
-  - timestamp.
+    Use inference-only execution:
 
-  ---
+    ```python
+    model.eval()
 
-  ## Observation Fields
+    with torch.inference_mode():
+        ...
+    ```
 
-  Each selected record must populate:
+    Do not enable gradients.
 
-  ```text
-  sample_id
-  task_id
-  initial_state_id
-  episode_id
-  step_id
-  normalized_episode_progress
-  base_rgb_raw
-  wrist_rgb_raw
-  state
-  prompt
-  episode_success
-  ```
+    ---
 
-  Use:
+    # 10. Persisted feature dtype — FROZEN
 
-  ```text
-  base_rgb_raw  = raw obs["agentview_image"]
-  wrist_rgb_raw = raw obs["robot0_eye_in_hand_image"]
-  prompt        = task.language
-  ```
+    Before serialization, every extracted representation must be:
 
-  For Pilot v0.1:
+    ```text
+    detach
+    → float32
+    → CPU
+    → remove batch dimension
+    → NumPy array
+    ```
 
-  ```text
-  episode_id == initial_state_id
-  ```
+    Persisted dtype:
 
-  because each frozen initial state defines one episode.
+    ```text
+    float32
+    ```
 
-  Arrays stored in the episode buffer must be copied so later environment mutation cannot alter already captured observations.
+    Expected per-sample arrays:
 
-  ---
+    ```text
+    o1_siglip:
+        shape = [256, 1152]
+        dtype = float32
 
-  ## Output Behavior
+    o1_fused:
+        shape = [256, 2176]
+        dtype = float32
 
-  Use the existing:
+    o2_projected:
+        shape = [256, 4096]
+        dtype = float32
+    ```
 
-  ```python
-  PilotObservation.save(...)
-  ```
+    The FP32 serialization format is for stable downstream numerical analysis.
 
-  serialization API.
+    It does not imply that the OpenVLA forward itself was FP32.
 
-  The collector should write one `.npz` file per selected sample.
+    ---
 
-  Do not implement:
+    # 11. Token preservation — FROZEN
 
-  ```text
-  manifest.jsonl
-  dataset database
-  global index
-  feature files
-  ```
+    C2 must save the complete patch-token tensors.
 
-  in this task.
+    Do not mean-pool during extraction.
 
-  Use the deterministic `sample_id` as the basis for the filename.
+    Do not:
 
-  Example:
+    - average the 256 tokens;
+    - select a subset of patches;
+    - perform PCA;
+    - perform SVD;
+    - quantize features;
+    - compress feature dimensions;
+    - compute attention-weighted features.
 
-  ```text
-  libero_spatial__task02__state03__step0047.npz
-  ```
+    Later analysis will derive frame-level vectors such as:
 
-  The output directory may be supplied by the caller.
+    ```python
+    frame_feature = token_feature.mean(axis=0)
+    ```
 
-  Do not silently overwrite an existing sample unless the existing project already has an explicit overwrite convention.
+    from the saved full tensors.
 
-  If no such convention exists, prefer explicit failure on collision.
+    ---
 
-  ---
+    # 12. Batching semantics — FROZEN
 
-  ## Smoke Mode
+    C2 may process multiple Pilot observations in one GPU batch.
 
-  The collector interface must make it possible to run the previously frozen smoke test:
+    Batching is only an implementation/runtime optimization.
 
-  ```text
-  1 task
-  2 initial states
-  5–10 sampled frames per episode
-  ```
+    It does not change the scientific sample unit.
 
-  without changing core rollout semantics.
+    Conceptually:
 
-  However:
+    ```text
+    sample A
+    sample B
+    sample C
+        ↓
+    processor batch
+        ↓
+    [B, 6, 224, 224]
+        ↓
+    feature extraction
+        ↓
+    split by batch index
+        ↓
+    one feature record per original sample
+    ```
 
-  - do not build a generalized experiment framework;
-  - do not implement multiple task-suite orchestration;
-  - do not add broad configuration infrastructure.
+    The mapping must remain exact:
 
-  A small parameter controlling:
+    ```text
+    feature[0] ↔ sample_id[0]
+    feature[1] ↔ sample_id[1]
+    ...
+    ```
 
-  ```text
-  initial_state_ids
-  num_samples_per_episode
-  ```
+    Do not depend on unordered filesystem iteration.
 
-  is sufficient if needed.
+    ---
 
-  The scientific Pilot defaults remain:
+    ## 12.1 batch_size
 
-  ```text
-  initial_state_ids = 0...9
-  num_samples_per_episode = 20
-  ```
+    Expose only a minimal runtime parameter:
 
-  ---
+    ```python
+    batch_size: int = 1
+    ```
 
-  ## Error Handling
+    `batch_size` is not a scientific parameter.
 
-  Fail explicitly on:
+    It must not affect feature values except for normal deterministic floating-point execution behavior.
 
-  - missing LIBERO observation keys;
-  - invalid dummy-phase termination/success;
-  - episode trajectory shorter than requested sample count;
-  - runtime/policy/environment exceptions;
-  - duplicate generated sample IDs;
-  - output-file collision;
-  - malformed canonical state.
+    Do not introduce a dataloader framework or generalized batching abstraction for C2.
 
-  Always close the LIBERO environment with reliable cleanup behavior, including when an exception occurs.
+    ---
 
-  Do not convert runtime exceptions into ordinary failed episodes.
+    # 13. Public API
 
-  ---
+    Introduce a minimal public API conceptually equivalent to:
 
-  ## Test Requirements
+    ```python
+    class OpenVLAFeatureExtractionError(RuntimeError):
+        ...
 
-  Tests should remain CPU-only and should not require:
 
-  - real LIBERO;
-  - MuJoCo rendering;
-  - GPU;
-  - OpenVLA checkpoint;
-  - network access.
+    def extract_openvla_features(
+        *,
+        model,
+        processor,
+        pretrained_checkpoint: str | Path,
+        observation_paths: Sequence[str | Path],
+        output_dir: str | Path,
+        center_crop: bool = True,
+        batch_size: int = 1,
+    ) -> tuple[Path, ...]:
+        ...
+    ```
 
-  Use small fake/stub objects only where necessary.
+    The exact spelling may change only if there is a concrete implementation reason identified during planning.
 
-  At minimum test:
+    Do not expose parameters for:
 
-  1. deterministic sample-ID generation;
-  2. canonical 8D state construction;
-  3. valid-policy `step_id` excludes dummy steps;
-  4. deterministic uniform sampling returns the requested number of unique ordered indices;
-  5. progress uses original trajectory index and full `T`;
-  6. `T < requested_samples` is rejected;
-  7. raw image arrays are copied rather than aliased;
-  8. dummy-phase early termination/success is rejected;
-  9. runtime rollout errors are not converted into ordinary episode failure;
-  10. output collision is rejected;
-  11. selected records are serialized through `PilotObservation`;
-  12. a small fake episode produces the expected selected sample IDs and metadata.
+    - task suite;
+    - task ID;
+    - camera resolution;
+    - token pooling;
+    - selected layers;
+    - selected backbone;
+    - projector choice;
+    - dtype selection;
+    - feature dimensions;
+    - π0;
+    - CCA;
+    - attack configuration.
 
-  Do not reproduce or unit-test the entire external OpenVLA model stack.
+    Those are frozen or outside C2.
 
-  ---
+    ---
 
-  ## Reviewability
+    # 14. Observation identity
 
-  Prefer direct procedural code over generalized frameworks.
+    Each input record must be loaded using:
 
-  Avoid introducing:
+    ```python
+    PilotObservation.load(...)
+    ```
 
-  - collector base classes;
-  - plugin systems;
-  - dataset registries;
-  - asynchronous workers;
-  - multiprocessing;
-  - callback frameworks;
-  - generic robotics abstractions.
+    The exact `PilotObservation.sample_id` is the canonical feature identity.
 
-  The code should be understandable as one small Pilot-specific collector.
+    Do not infer identity from input file ordering.
 
-  ---
+    Do not generate a new UUID.
 
-  ## Planning Requirement
+    Do not renumber observations.
 
-  Before modifying files:
+    ---
 
-  1. inspect the relevant current-project code;
-  2. inspect only the minimum official Tex3D rollout files needed;
-  3. propose the exact production/test files;
-  4. describe the minimal collector API;
-  5. explain how OpenVLA policy execution will be invoked without copying unrelated attack logic;
-  6. identify any remaining ambiguity.
+    # 15. Feature serialization — FROZEN
 
-  For the first response to this contract:
+    Serialize exactly one feature `.npz` per Pilot sample.
 
-  ```text
-  DO NOT MODIFY FILES.
-  ```
+    Recommended output filename:
 
-  Return only the implementation plan.
+    ```text
+    {sample_id}.npz
+    ```
 
-  Implementation begins only after the plan is reviewed.
+    One file contains all three representations.
 
-  ---
+    Required array keys:
 
-  ## Stop Condition
+    ```text
+    o1_siglip
+    o1_fused
+    o2_projected
+    ```
 
-  After the approved implementation is complete:
+    Required metadata must contain at least:
 
-  1. run the smallest relevant tests;
-  2. inspect the final diff for scope creep;
-  3. stop.
+    ```text
+    sample_id
+    source_model = "openvla"
+    checkpoint
+    feature_schema_version
+    ```
 
-  Do not start C2 OpenVLA representation extraction.
+    Keep metadata minimal.
 
-  Final implementation report must include only:
+    Do not duplicate the complete `PilotObservation` metadata.
 
-  - files changed;
-  - public API introduced;
-  - official reference code used;
-  - rollout semantics implemented;
-  - sampling semantics implemented;
-  - error handling implemented;
-  - tests run and results;
-  - assumptions made;
-  - unresolved questions;
-  - behavior intentionally left unchanged.
+    The original observation remains the source of truth for:
+
+    - task;
+    - episode;
+    - step;
+    - prompt;
+    - success;
+    - raw images;
+    - state.
+
+    Feature ↔ observation pairing is:
+
+    ```text
+    feature.sample_id == PilotObservation.sample_id
+    ```
+
+    ---
+
+    # 16. Serialization safety
+
+    Use a non-pickle NumPy serialization format.
+
+    Feature files must be loadable with:
+
+    ```python
+    np.load(path, allow_pickle=False)
+    ```
+
+    Do not store Python objects.
+
+    Do not silently overwrite an existing feature file.
+
+    Before writing a batch, validate all intended output paths for that batch.
+
+    A serialization/runtime error must be explicit.
+
+    Do not silently skip failed samples.
+
+    Do not substitute another Pilot observation.
+
+    ---
+
+    # 17. Input validation
+
+    Fail explicitly for at least:
+
+    - empty observation list;
+    - duplicate input paths if they resolve to the same Pilot sample;
+    - duplicate `sample_id`;
+    - missing observation file;
+    - invalid `PilotObservation`;
+    - invalid `base_rgb_raw`;
+    - nonpositive/noninteger `batch_size`;
+    - incompatible model architecture;
+    - processor output without six visual channels;
+    - unexpected branch feature rank;
+    - unexpected token count;
+    - unexpected feature dimensions;
+    - output path collision;
+    - runtime preprocessing error;
+    - model forward error;
+    - serialization error.
+
+    For this frozen Pilot, expected token count is:
+
+    ```text
+    256
+    ```
+
+    Unexpected shapes should be treated as architecture/checkpoint mismatch, not silently accepted.
+
+    ---
+
+    # 18. Output ordering
+
+    The returned:
+
+    ```python
+    tuple[Path, ...]
+    ```
+
+    must correspond to the exact order of the input `observation_paths`.
+
+    Batching must not change output ordering.
+
+    ---
+
+    # 19. Files allowed
+
+    Prefer:
+
+    ```text
+    new:
+        shared_feature/openvla_features.py
+
+    new:
+        tests/test_openvla_features.py
+
+    minimal optional update:
+        shared_feature/__init__.py
+    ```
+
+    Do not modify:
+
+    ```text
+    shared_feature/pilot_observation.py
+    shared_feature/libero_collector.py
+    ```
+
+    unless planning identifies a genuine blocker.
+
+    If C2 appears to require modifying C1 production code, stop and explain why before implementation.
+
+    Do not create a generic feature framework.
+
+    ---
+
+    # 20. Official/reference source boundaries
+
+    Relevant OpenVLA references include:
+
+    ```text
+    ../openvla/prismatic/extern/hf/modeling_prismatic.py
+    ../openvla/prismatic/extern/hf/processing_prismatic.py
+    ../openvla/experiments/robot/openvla_utils.py
+    ../openvla/experiments/robot/libero/libero_utils.py
+    ```
+
+    Relevant current-project references:
+
+    ```text
+    shared_feature/pilot_observation.py
+    shared_feature/libero_collector.py
+    ```
+
+    Use the loaded checkpoint's actual model/processor attributes as runtime truth.
+
+    Do not inspect or copy unrelated OpenVLA training code.
+
+    `../modified-tex3d` is not needed for normal C2 implementation unless a specific already-known preprocessing correctness question requires targeted confirmation.
+
+    ---
+
+    # 21. Unit tests
+
+    Tests must be CPU-only and use minimal fakes/stubs.
+
+    Do not require a real 7B checkpoint for unit tests.
+
+    At minimum cover:
+
+    1. deterministic one-to-one `sample_id` mapping;
+
+    2. input observation order is preserved through batching;
+
+    3. duplicate `sample_id` is rejected;
+
+    4. existing output collision is rejected without overwrite;
+
+    5. C1-compatible preprocessing path is invoked with the frozen 512 → 224 behavior;
+
+    6. center-crop behavior is invoked when `center_crop=True`;
+
+    7. checkpoint processor output is used for visual tensors;
+
+    8. six-channel processor output is split exactly:
+       - channels 0:3 → DINO;
+       - channels 3:6 → SigLIP;
+
+    9. DINO branch is evaluated exactly once per batch;
+
+    10. SigLIP branch is evaluated exactly once per batch;
+
+    11. fused representation equals:
+        ```python
+        torch.cat([dino_feature, siglip_feature], dim=-1)
+        ```
+
+    12. projector receives exactly O1-F;
+
+    13. full token dimension is retained;
+
+    14. no mean pooling occurs;
+
+    15. batch dimension is removed during per-sample serialization;
+
+    16. persisted arrays are FP32;
+
+    17. expected output shapes are enforced:
+        ```text
+        O1-S = [256, 1152]
+        O1-F = [256, 2176]
+        O2   = [256, 4096]
+        ```
+
+    18. malformed six-channel processor output is rejected;
+
+    19. malformed feature shapes are rejected;
+
+    20. runtime/model exception is converted to
+        `OpenVLAFeatureExtractionError`
+        with the original exception preserved as the cause;
+
+    21. every generated `.npz` loads with:
+        ```python
+        np.load(..., allow_pickle=False)
+        ```
+
+    22. metadata contains the correct `sample_id`, source model, checkpoint, and schema version.
+
+    Keep tests focused on the frozen C2 contract.
+
+    Do not create a generalized fake VLA framework.
+
+    ---
+
+    # 22. Real C2 smoke test — NOT part of the first implementation turn
+
+    After unit implementation is reviewed, a separate real smoke integration will verify the extractor using:
+
+    - the real C1 smoke observations;
+    - the same OpenVLA checkpoint used by C1;
+    - real BF16 OpenVLA on GPU.
+
+    Do not run this real smoke until explicitly authorized.
+
+    The real smoke must eventually verify:
+
+    ```text
+    C2 reconstructed pixel_values
+    ==
+    normal C1/OpenVLA policy preprocessing pixel_values
+    ```
+
+    for at least one known Pilot sample, ideally with exact equality or a reported zero/max absolute difference.
+
+    It must also verify real feature shapes:
+
+    ```text
+    O1-S = [256,1152]
+    O1-F = [256,2176]
+    O2   = [256,4096]
+    ```
+
+    and confirm all serialized arrays are FP32 CPU NumPy arrays.
+
+    ---
+
+    # 23. Explicitly forbidden in C2
+
+    Do not implement:
+
+    - π0 feature extraction;
+    - π0 preprocessing;
+    - DINO/SigLIP hooks;
+    - model-source modifications;
+    - language-model hidden-state extraction;
+    - action-token extraction;
+    - mean pooling;
+    - PCA/SVD;
+    - CCA;
+    - CKA;
+    - regression;
+    - shuffled baselines;
+    - train/held-out split logic;
+    - feature-space attack loss;
+    - Tex3D attack integration;
+    - differentiable rendering;
+    - model ensembles;
+    - manifest/index framework;
+    - multiprocessing;
+    - distributed extraction;
+    - generalized experiment configuration.
+
+    Stop when C2 is complete.
+
+    ---
+
+    # 24. First Codex response — planning only
+
+    For the first turn after this contract is installed:
+
+    **Do not modify files.**
+
+    Read:
+
+    ```text
+    AGENTS.md
+    docs/research-map.md
+    docs/pilot-v0.1-spec.md
+    task.md
+    shared_feature/pilot_observation.py
+    shared_feature/libero_collector.py
+    ```
+
+    Then inspect only the OpenVLA source files necessary to verify this contract.
+
+    Return a minimal read-only implementation plan containing:
+
+    1. exact files to create or modify;
+
+    2. proposed public API;
+
+    3. exact OpenVLA model attributes to call for:
+       - DINO;
+       - SigLIP;
+       - fused representation;
+       - projector;
+
+    4. exact preprocessing path from:
+       ```text
+       PilotObservation.base_rgb_raw
+       ```
+       to:
+       ```text
+       pixel_values
+       ```
+
+    5. how C1 preprocessing equivalence will be preserved without modifying C1;
+
+    6. how the checkpoint processor's six-channel tensor will be split;
+
+    7. how device/dtype will be inferred from the loaded model;
+
+    8. how batching preserves exact `sample_id` ordering;
+
+    9. exact NPZ layout and metadata representation;
+
+    10. focused CPU tests;
+
+    11. every assumption not explicitly frozen by this contract;
+
+    12. every conflict found between:
+        - this contract;
+        - current C1 implementation;
+        - OpenVLA source behavior.
+
+    Do not implement anything in that first response.
+
+    Do not start π0/C3.
+
+    Stop after the plan.
