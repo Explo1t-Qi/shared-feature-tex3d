@@ -343,6 +343,41 @@ def test_fake_episode_serializes_selected_raw_records(
     ]
 
 
+def test_policy_done_without_success_serializes_only_policy_inputs(
+    monkeypatch, tmp_path
+) -> None:
+    env = FakeEnv(
+        success_after_policy_actions=None,
+        done_after_policy_actions=21,
+    )
+    factory = install_fake_runtime(monkeypatch, env)
+
+    paths = collector.collect_pilot_observations(
+        model=object(),
+        processor=object(),
+        pretrained_checkpoint="checkpoint",
+        output_dir=tmp_path,
+        initial_state_ids=(0,),
+        num_samples_per_episode=5,
+    )
+
+    records = [PilotObservation.load(path) for path in paths]
+    assert env.policy_action_count == 21
+    assert len(factory.policy_observations) == 21
+    assert not env.current_success
+    assert all(not record.episode_success for record in records)
+    assert [record.step_id for record in records] == [0, 5, 10, 15, 20]
+    assert [int(record.base_rgb_raw[0, 0, 0]) for record in records] == [
+        10,
+        15,
+        20,
+        25,
+        30,
+    ]
+    assert int(env.observation["agentview_image"][0, 0, 0]) == 31
+    assert env.closed
+
+
 def test_policy_action_limit_is_a_normal_failed_episode(
     monkeypatch, tmp_path
 ) -> None:
