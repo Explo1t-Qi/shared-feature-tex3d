@@ -1,1048 +1,1254 @@
-- - # C3 Coding Contract — π0.5 Representation Extractor
+# C4 Coding Contract — Paired Feature Dataset Manifest
 
-    ## Goal
+## Goal
 
-    Implement the Pilot v0.1 π0.5 representation extractor for the official OpenPI LIBERO model:
+Implement the Pilot v0.1 paired-feature dataset validator and manifest builder.
 
-        config = "pi05_libero"
-        checkpoint = "gs://openpi-assets/checkpoints/pi05_libero"
-    
-    The extractor must:
-    
-    1. load existing PilotObservation records;
-    2. reproduce the official OpenPI LIBERO client-side image preprocessing;
-    3. reconstruct the official pi05_libero policy input;
-    4. reuse the official OpenPI server-side inference transforms;
-    5. construct the batched model Observation using official semantics;
-    6. extract the base-camera π0.5 visual representations P1 and P2;
-    7. preserve sample identity and provenance;
-    8. serialize one feature artifact per observation.
+C4 must establish a scientifically valid one-to-one correspondence between the already extracted:
 
-    This task is C3 extractor implementation only.
+    OpenVLA feature artifacts
 
-    Do not implement the real π0.5 integration smoke in this turn.
-    
-    ---
-    
-    ## Scientific Contract
-    
-    Pilot v0.1 compares:
-    
-        OpenVLA O1-S ↔ π0.5 P1
-        OpenVLA O2   ↔ π0.5 P2
-    
-    The frozen Physical Intelligence target is:
-    
-        config = "pi05_libero"
-    
-    with official released checkpoint identifier:
-    
-        checkpoint = "gs://openpi-assets/checkpoints/pi05_libero"
-    
-    The relevant model semantics are:
-    
-        Pi0Config(
-            pi05=True,
-            action_horizon=10,
-            discrete_state_input=False,
-        )
-    
-    Do not substitute:
-    
-    - classic π0;
-    - π0-FAST;
-    - another OpenPI checkpoint;
-    - another standalone SigLIP implementation.
+and:
 
-    The scientific preprocessing design has already been audited against OpenPI commit:
+    π0.5 feature artifacts
 
-        15a9616a00943ada6c20a0f158e3adb39df2ccac
-    
-    Do not reopen or modify the frozen scientific design unless implementation reveals a genuine source contradiction.
-    
-    ---
-    
-    ## Allowed Production Files
-    
-    Prefer no more than:
-    
-        shared_feature/pi05_features.py
-        shared_feature/__init__.py
-    
-    Tests may add:
-    
-        tests/test_pi05_features.py
-    
-    Do not modify unrelated production files.
-    
-    Do not modify:
-    
-        ../openpi
-        ../openvla
-        ../LIBERO
-        ../tex3d
-        ../modified-tex3d
+before any cross-model representation analysis begins.
 
-    If implementation cannot satisfy this contract without modifying upstream OpenPI or changing the frozen scientific semantics, STOP and report the blocker.
+The purpose of C4 is to answer:
 
-    ---
-    
-    ## Forbidden Scope
+    Do the OpenVLA and π0.5 feature archives refer to exactly
+    the same Pilot observations, with valid feature schemas and
+    matching raw-image provenance?
 
-    Do not implement or modify:
+C4 must:
 
-    - C3 real π0.5 integration smoke;
-    - checkpoint model downloading/loading inside the core extractor;
-    - paired-feature validator;
-    - PCA / SVD;
-    - CCA / SVCCA;
-    - CKA;
-    - linear regression;
-    - mean pooling;
-    - token-level analysis;
-    - object-region analysis;
-    - Tex3D integration;
-    - shared-feature attack loss;
-    - adversarial texture optimization;
-    - Gemma hidden-state extraction;
-    - Action Expert feature extraction;
-    - wrist-camera feature serialization;
-    - OpenVLA C2 behavior;
-    - OpenPI source code;
-    - forward hooks;
-    - duplicated SigLIP forward implementations;
-    - standalone replacement vision encoders;
-    - unrelated refactors.
-    
-    Do not mark full C3 PASS in this task.
-    
-    ---
-    
-    ## Public API
-    
-    Implement:
-    
-        class Pi05FeatureExtractionError(RuntimeError):
-            ...
+1. discover OpenVLA feature archives;
+2. discover π0.5 feature archives;
+3. validate both feature schemas;
+4. require exact equality of the two sample sets;
+5. pair samples by metadata sample_id;
+6. verify source_image_hash equality for every pair;
+7. freeze a deterministic sample order;
+8. write a lightweight paired-feature manifest.
 
-    and:
+C4 must NOT perform any representation-similarity analysis.
 
-        def extract_pi05_features(
-            *,
-            model,
-            train_config,
-            checkpoint: str | Path,
-            norm_stats,
-            observation_paths: Sequence[str | Path],
-            output_dir: str | Path,
-            batch_size: int = 1,
-        ) -> tuple[Path, ...]:
-            ...
+---
 
-    `norm_stats` is a required dependency.
+## Current Project Status
 
-    It must represent the checkpoint-associated normalization statistics loaded by the caller from the same released checkpoint used for the model.
+Already closed:
 
-    Do not provide a silent fallback to:
+    C0 PilotObservation schema                   PASS
+    C1 LIBERO observation collector              PASS
+    C1 real OpenVLA/LIBERO smoke                 PASS
+    C2 OpenVLA feature extractor                 PASS
+    C2 real OpenVLA/GPU smoke                    PASS
+    C3 π0.5 feature extractor                    PASS
+    C3 real π0.5 integration smoke               PASS
 
-        data_config.norm_stats
+C3 canonical scientific extraction is frozen to:
 
-    or unrelated local assets.
+    batch_size = 1
 
-    The `checkpoint` argument remains the stable provenance identifier used in output metadata.
+for Pilot v0.1 π0.5 feature generation.
 
-    The core extractor receives:
+The optional batch-size>1 numerical mismatch observed during C3 smoke is an engineering note and is not part of C4.
 
-    - an already loaded JAX/NNX-compatible π0.5 model;
-    - the corresponding pi05_libero TrainConfig;
-    - checkpoint-associated norm_stats.
-    
-    Do not make checkpoint downloading or complete policy construction part of the core extractor.
-    
-    Small private helpers are allowed.
-    
-    Do not expose unnecessary implementation details as public API.
-    
-    ---
-    
-    ## Norm-Stats Ownership
-    
-    The caller is responsible for loading checkpoint-associated norm stats using the official OpenPI checkpoint-loading path.
-    
-    The core extractor must only consume the supplied:
-    
-        norm_stats
-    
-    and must not trigger download of the full checkpoint.
+---
 
-    The extractor must validate that supplied stats are compatible with the pi05_libero inference path.
-    
-    At minimum:
-    
-    - a `state` entry must be available;
-    - required quantile statistics for PI05 normalization must be present;
-    - malformed or incompatible stats must fail loudly.
-    
-    Do not silently replace missing checkpoint stats with configuration-default or stale local stats.
-    
-    ---
-    
-    ## Input Records
-    
-    Each input path must load through the existing:
-    
-        PilotObservation
-    
-    schema.
-    
-    The extractor requires:
-    
-        sample_id
-        base_rgb_raw
-        wrist_rgb_raw
-        state
-        prompt
-    
-    The returned tuple must preserve the exact input observation order.
-    
-    Reject:
-    
-    - missing input files;
-    - invalid PilotObservation archives;
-    - duplicate input paths;
-    - duplicate sample_id values;
-    - unsafe sample_id values;
-    - output collisions.
+## Frozen C4 Decisions
 
-    Do not depend on lexical filename ordering for sample identity.
+### DECISION 1 — Exact Sample-Set Equality
 
-    ---
+C4 requires:
 
-    ## Canonical State Validation
+    set(OpenVLA sample_ids)
+    ==
+    set(π0.5 sample_ids)
 
-    C3 must explicitly validate the frozen C1 LIBERO state representation.
+Do not silently use only the intersection.
 
-    Require:
-    
-        state.shape == (8,)
-    
-    with:
+If either side contains unmatched samples, validation must fail and report the missing IDs.
 
-        real numeric dtype
-        all finite values
-    
-    The expected semantics are:
-    
-        eef_pos            3
-        axis-angle quat    3
-        gripper_qpos       2
-                           —
-                           8
-    
-    Do not silently reshape, truncate, pad, or reinterpret malformed source state before the official OpenPI transforms.
-    
-    The later official:
-    
-        PadStatesAndActions(32)
-    
-    is responsible for model-side state padding.
-    
-    ---
-    
-    ## Safe sample_id
-    
-    Because the output filename is:
-    
-        {sample_id}.npz
-    
-    `sample_id` must be a safe single filesystem path component.
-    
-    Reject values that would allow:
-    
-    - absolute paths;
-    - parent traversal;
-    - embedded path separators;
-    - `"."`;
-    - `".."`;
-    - escaping output_dir.
-    
-    Do not reject otherwise valid identifiers merely because they contain ordinary punctuation such as a period.
+---
 
-    C1-generated Pilot sample IDs should pass unchanged.
+### DECISION 2 — Pair Identity
 
-    ---
+A valid cross-model pair requires BOTH:
 
-    ## Raw Observation Semantics
+    OpenVLA.sample_id == π0.5.sample_id
 
-    PilotObservation stores raw LIBERO observations before π0.5-specific preprocessing.
+and:
 
-    In particular:
+    OpenVLA.source_image_hash
+    ==
+    π0.5.source_image_hash
 
-        base_rgb_raw
-        wrist_rgb_raw
-    
-    must remain unchanged as the common cross-model observation source.
+Matching filenames alone are insufficient.
 
-    The extractor must not mutate these arrays in place.
+Matching sample_id alone is insufficient.
 
-    Before preprocessing, validate both images:
+The source_image_hash is the cross-model proof that both representations originate from the same raw:
 
-        image.ndim == 3
-        image.shape[-1] == 3
-        image.dtype == uint8
+    PilotObservation.base_rgb_raw
 
-    Do not compute provenance from any preprocessed image.
+---
 
-    ---
+### DECISION 3 — Metadata sample_id Is Authoritative
 
-    ## Source Image Hash
+Do not require:
 
-    Compute:
+    filename stem == metadata.sample_id
 
-        source_image_hash
-    
-    from the ORIGINAL:
+Archive filenames are storage details.
 
-        PilotObservation.base_rgb_raw
+The metadata field:
 
-    before:
+    sample_id
 
-    - 180° rotation;
-    - resize_with_pad;
-    - convert_to_uint8;
-    - LiberoInputs;
-    - normalization;
-    - Observation.from_dict;
-    - any other model-specific preprocessing.
+is the authoritative identity used for:
 
-    Use:
+- duplicate detection;
+- sample-set equality;
+- cross-model pairing;
+- deterministic manifest ordering.
 
-        hashlib.sha256(
-            np.ascontiguousarray(
-                record.base_rgb_raw
-            ).tobytes()
-        ).hexdigest()
-    
-    Serialize as:
+A valid archive may have a filename unrelated to its sample_id.
 
-        sha256:<hex_digest>
+Do not silently rewrite or infer sample_id from the filename.
 
-    Do not compute the pairing hash from:
-    
-    - rotated images;
-    - resized images;
-    - client policy images;
-    - base_0_rgb;
-    - normalized images;
-    - SigLIP input arrays;
-    - wrist images.
+---
 
-    This hash must remain directly comparable with the existing OpenVLA C2 source_image_hash.
+### DECISION 4 — No Representation Analysis
 
-    ---
+C4 must not perform:
 
-    ## Official LIBERO Client-Side Image Preprocessing
+- mean pooling;
+- max pooling;
+- CLS-style pooling;
+- token pooling;
+- feature flattening for analysis;
+- PCA;
+- SVD;
+- CCA;
+- SVCCA;
+- CKA;
+- cosine similarity;
+- Euclidean similarity analysis;
+- linear regression;
+- R²;
+- canonical correlation;
+- shuffled-null analysis;
+- train / held-out splitting.
 
-    This step is REQUIRED.
+Those belong to later milestones.
 
-    The official OpenPI LIBERO client performs model-specific image preprocessing before constructing the policy input dictionary.
-    
-    For both base and wrist images reproduce:
-    
-        raw LIBERO image
-            ↓
-        180° rotation
-            ↓
-        np.ascontiguousarray
-            ↓
-        openpi_client.image_tools.resize_with_pad(224, 224)
-            ↓
-        openpi_client.image_tools.convert_to_uint8
-    
-    The 180° rotation semantics are:
-    
-        image[::-1, ::-1]
-    
-    Equivalent behavior:
-    
-        base_image = np.ascontiguousarray(
-            record.base_rgb_raw[::-1, ::-1]
-        )
-        
-        wrist_image = np.ascontiguousarray(
-            record.wrist_rgb_raw[::-1, ::-1]
-        )
-        
-        base_image = image_tools.convert_to_uint8(
-            image_tools.resize_with_pad(
-                base_image,
-                224,
-                224,
-            )
-        )
-        
-        wrist_image = image_tools.convert_to_uint8(
-            image_tools.resize_with_pad(
-                wrist_image,
-                224,
-                224,
-            )
-        )
-    
-    Use the official OpenPI/OpenPI-client utilities corresponding to the audited path.
-    
-    Do not substitute:
+---
 
-    - PIL.Image.resize;
-    - OpenCV resize;
-    - torchvision resize;
-    - custom image normalization;
-    - OpenVLA preprocessing;
-    - ImageNet normalization;
-    - custom orientation handling.
-    
-    The raw PilotObservation arrays must remain unmodified.
-    
-    ---
-    
-    ## Official LIBERO Policy Input Reconstruction
-    
-    Only after client-side preprocessing construct:
-    
-        {
-            "observation/image": base_image,
-            "observation/wrist_image": wrist_image,
-            "observation/state": record.state,
-            "prompt": record.prompt,
-        }
-    
-    Do NOT construct the π0.5 policy dictionary directly from:
-    
-        record.base_rgb_raw
-        record.wrist_rgb_raw
-    
-    without the required official client preprocessing.
-    
-    ---
-    
-    ## DataConfig Construction
-    
-    Construct the pi05_libero data configuration using the existing TrainConfig boundary:
-    
-        data_config = train_config.data.create(
-            train_config.assets_dirs,
-            train_config.model,
-        )
-    
-    Do not reimplement the semantics of the data configuration.
-    
-    The resulting configuration should provide the official:
-    
-    - LIBERO input transforms;
-    - normalization mode;
-    - model transforms;
-    - asset identity.
-    
-    Validate that the resulting configuration is compatible with the frozen pi05_libero semantics.
-    
-    ---
-    
-    ## Official Server-Side Transform Orchestration
-    
-    OpenPI does not expose a dedicated standalone helper whose sole purpose is C3 preprocessing.
-    
-    Therefore C3 is explicitly allowed to perform minimal transform orchestration using the existing official OpenPI transform objects.
-    
-    This is allowed:
-    
-        compose official transform objects
-        in create_trained_policy-compatible order
+### DECISION 5 — Manifest Only
 
-    This is forbidden:
-    
-        reimplement individual transform algorithms
-    
-    The implementation should preserve the inference ordering semantics of the official policy construction for the current no-external-default-prompt case:
-    
-        InjectDefaultPrompt(None)
-            ↓
-        data_config.data_transforms.inputs
-            ↓
-        Normalize(
-            norm_stats,
-            use_quantiles=data_config.use_quantile_norm,
-        )
-            ↓
-        data_config.model_transforms.inputs
-    
-    Use existing OpenPI transform classes and composition utilities.
-    
-    Do not duplicate the implementations of:
-    
-    - LiberoInputs;
-    - Normalize;
-    - ResizeImages;
-    - TokenizePrompt;
-    - PadStatesAndActions;
-    - InjectDefaultPrompt.
+C4 produces a lightweight manifest.
 
-    Do not invoke full create_trained_policy merely to obtain preprocessing, because that would introduce inappropriate model/checkpoint loading into C3.
-    
-    ---
-    
-    ## Normalization Semantics
-    
-    PI05 uses:
-    
-        use_quantiles = True
-    
-    for the official pi05_libero configuration.
-    
-    The extractor must preserve the official:
-    
-        Normalize(
-            norm_stats,
-            use_quantiles=True,
-        )
-    
-    semantics.
-    
-    Normalize affects only input fields with matching norm-stat entries.
-    
-    Do not apply checkpoint normalization indiscriminately to all fields.
-    
-    Do not manually normalize RGB arrays here.
-    
-    The image model-range conversion occurs later through:
-    
-        Observation.from_dict(...)
-    
-    which converts uint8 RGB values from:
-    
-        [0, 255]
-    
-    to:
-    
-        float32 [-1, 1]
-    
-    ---
-    
-    ## Official Image-Slot Semantics
-    
-    After LiberoInputs for PI05, preserve exactly:
-    
-        base_0_rgb
-        left_wrist_0_rgb
-        right_wrist_0_rgb
-    
-    with:
-    
-        base_0_rgb        = real client-preprocessed base image
-        left_wrist_0_rgb  = real client-preprocessed wrist image
-        right_wrist_0_rgb = np.zeros_like(base_image)
-    
-    and masks:
-    
-        base_0_rgb        = True
-        left_wrist_0_rgb  = True
-        right_wrist_0_rgb = False
-    
-    The extractor must construct and validate the complete official image-slot semantics.
-    
-    Pilot v0.1 feature extraction uses only:
-    
-        observation.images["base_0_rgb"]
-    
-    for P1 and P2.
-    
-    Do not serialize wrist-camera representations.
-    
-    Do not use the dummy right-wrist slot for feature extraction.
-    
-    ---
-    
-    ## Per-Record Transform Boundary
-    
-    Official OpenPI transforms operate on unbatched per-record dictionaries.
-    
-    Therefore for every PilotObservation:
-    
-    1. load and validate the record;
-    2. compute provenance from raw base_rgb_raw;
-    3. perform official client preprocessing;
-    4. construct an independent policy dictionary;
-    5. apply the composed official server transform pipeline;
-    6. store the independently transformed result.
-    
-    Do not pass a pre-stacked batch through transforms that expect unbatched dictionaries.
-    
-    Do not reuse mutable nested dictionaries across records.
-    
-    Some transforms mutate input structures.
-    
-    ---
-    
-    ## Batching Boundary
-    
-    Only after all records in the current batch have independently passed through the official transform pipeline:
-    
-    1. stack equivalent leaves in original input order;
-    2. convert stacked values to JAX-compatible arrays;
-    3. construct the batched Observation.
-    
-    Batching must preserve:
-    
-    - sample order;
-    - sample identity;
-    - one-to-one provenance;
-    - one-to-one P1/P2 correspondence.
-    
-    Support:
-    
-        batch_size >= 1
-    
-    Default:
-    
-        batch_size = 1
-    
-    Do not introduce multiprocessing, distributed inference, or asynchronous extraction.
-    
-    ---
-    
-    ## Observation Construction
-    
-    After stacking transformed records:
-    
-        batched_dict
-            ↓
-        convert leaves to jax.Array-compatible values
-            ↓
-        Observation.from_dict(batched_dict)
-    
-    Preserve the OpenPI inference semantics where image uint8 arrays become:
-    
-        float32 [-1, 1]
-    
-    Do not bypass Observation.from_dict with custom image conversion.
-    
-    Because Observation.from_dict may mutate nested image structures, each batch tree must be independently constructed.
-    
-    ---
-    
-    ## preprocess_observation
-    
-    After constructing the batched Observation, call:
-    
-        observation = preprocess_observation(
-            None,
-            observation,
-            train=False,
-        )
-    
-    Call this once on the batched Observation.
-    
-    Do not apply it independently to each record before batching.
-    
-    Do not introduce training-time random augmentation.
-    
-    For valid official inference images already at 224×224, image geometry is expected to remain unchanged, but this call remains part of the frozen inference path.
-    
-    ---
-    
-    ## Representation Extraction
-    
-    Use the real JAX/NNX π0.5 visual module directly.
-    
-    For:
-    
-        observation.images["base_0_rgb"]
-    
-    call:
-    
-        p2, aux = model.PaliGemma.img(
-            observation.images["base_0_rgb"],
-            train=False,
-        )
-    
-    then:
-    
-        p1 = aux["encoded"]
-    
-    No hooks.
-    
-    No OpenPI source modification.
-    
-    No duplicated SigLIP forward implementation.
-    
-    No standalone replacement vision encoder.
-    
-    No deeper Gemma or Action Expert extraction.
-    
-    ---
-    
-    ## P1 Definition
-    
-    P1 is:
-    
-        aux["encoded"]
-    
-    Semantics:
-    
-        π0.5 SigLIP So400m/14 encoder output
-        after final encoder normalization
-        before the 1152 → 2048 image projection
-    
-    Expected batched shape:
-    
-        [B, 256, 1152]
-    
-    Serialized per-sample shape:
-    
-        [256, 1152]
-    
-    Preserve all 256 tokens.
-    
-    No pooling.
-    
-    ---
-    
-    ## P2 Definition
-    
-    P2 is the first return value of:
-    
-        model.PaliGemma.img(...)
-    
-    Semantics:
-    
-        π0.5 PaliGemma-ready projected image tokens
-        after the SigLIP 1152 → 2048 projection
-        before deeper Gemma processing
-    
-    Expected batched shape:
-    
-        [B, 256, 2048]
-    
-    Serialized per-sample shape:
-    
-        [256, 2048]
-    
-    Preserve all 256 tokens.
-    
-    No pooling.
-    
-    ---
-    
-    ## JAX → NumPy Serialization Boundary
-    
-    For extracted JAX arrays use explicit device-to-host conversion semantics equivalent to:
-    
-        np.asarray(
-            jax.device_get(value),
-            dtype=np.float32,
-        )
-    
-    Do not rely on implicit device conversion during np.savez.
-    
-    Before writing each sample:
-    
-    - remove the batch dimension by indexing the correct sample;
-    - convert P1 to float32 NumPy;
-    - convert P2 to float32 NumPy;
-    - validate shapes and values.
-    
-    ---
-    
-    ## Serialization
-    
-    Write exactly one π0.5 feature archive per observation:
-    
-        {sample_id}.npz
-    
-    Each archive must contain exactly:
-    
-        p1_siglip
-        p2_projected
-        metadata_json
-    
-    Required arrays:
-    
-        p1_siglip
-            shape = (256, 1152)
-            dtype = float32
-        
-        p2_projected
-            shape = (256, 2048)
-            dtype = float32
-    
-    Before writing validate:
-    
-    - exact expected shape;
-    - finite values;
-    - non-empty arrays;
-    - not trivially all-zero.
-    
-    Do not serialize the complete SigLIP auxiliary dictionary.
-    
-    Use compressed NPZ consistent with the existing project convention.
-    
-    ---
-    
-    ## Provenance Metadata
-    
-    metadata_json must contain exactly:
-    
-        sample_id
-        source_model
-        checkpoint
-        feature_schema_version
-        source_image_hash
-    
-    Use:
-    
-        source_model = "pi05"
-    
-    and:
-    
-        feature_schema_version = "pi05_features_v1"
-    
-    `checkpoint` must preserve the caller-provided checkpoint identifier deterministically.
-    
-    Do not add:
-    
-        node_name
-    
-    Do not duplicate representation shape or dtype metadata in metadata_json.
-    
-    ---
-    
-    ## Error Handling
-    
-    Raise:
-    
-        Pi05FeatureExtractionError
-    
-    for extractor-level external-boundary failures.
-    
-    Appropriate wrapped boundaries include:
-    
-    - PilotObservation loading;
-    - OpenPI dependency loading;
-    - client preprocessing;
-    - transform construction;
-    - transform execution;
-    - model invocation;
-    - JAX device transfer;
-    - serialization.
-    
-    If a Pi05FeatureExtractionError is already raised internally, propagate it unchanged.
-    
-    For wrapped external exceptions preserve:
-    
-        __cause__
-    
-    using normal exception chaining.
-    
-    Fail loudly for:
-    
-    - invalid PilotObservation;
-    - malformed raw images;
-    - invalid canonical state;
-    - unsafe sample_id;
-    - duplicate input path;
-    - duplicate sample_id;
-    - output collision;
-    - incompatible TrainConfig;
-    - malformed norm_stats;
-    - missing required state norm stats;
-    - missing OpenPI preprocessing dependency;
-    - malformed image slots;
-    - unexpected image masks;
-    - batching mismatch;
-    - missing PaliGemma.img;
-    - missing aux["encoded"];
-    - unexpected P1 shape;
-    - unexpected P2 shape;
-    - non-finite output features.
-    
-    Do not silently skip bad samples.
-    
-    Do not broadly wrap obvious internal programmer errors if doing so would destroy useful diagnostics.
-    
-    ---
-    
-    ## Unit-Test Strategy
-    
-    Do not create one test function for every checklist item.
-    
-    Use a small number of focused tests that collectively validate the required behavior.
-    
-    Mocks/fakes should model only the necessary public behavior.
-    
-    Do not reimplement OpenPI in the tests.
-    
-    ### Unit-Level Behaviors to Verify
-    
-    Tests should collectively cover:
-    
-    1. PilotObservation loading and input-order preservation;
-    2. raw base/wrist images are not mutated;
-    3. canonical state validation:
-           shape == (8,)
-           numeric real dtype
-           finite values;
-    4. safe sample_id validation;
-    5. exact raw source_image_hash semantics;
-    6. 180° rotation for base and wrist images;
-    7. official resize_with_pad utility usage;
-    8. official convert_to_uint8 utility usage;
-    9. client preprocessing occurs before policy-dict construction;
-    10. policy dict receives processed base/wrist images;
-    11. correct DataConfig construction from TrainConfig;
-    12. explicit supplied norm_stats are used;
-    13. missing/malformed norm_stats fail;
-    14. official transform objects are composed in correct inference ordering;
-    15. transforms operate per record before batching;
-    16. mutable transformed dictionaries are independent;
-    17. PI05 camera slots and masks are correct;
-    18. right-wrist slot uses zero padding;
-    19. batching preserves order and identity;
-    20. Observation.from_dict is used after batching;
-    21. preprocess_observation(..., train=False) is applied to batched Observation;
-    22. only base_0_rgb is sent to the visual module;
-    23. model.PaliGemma.img is the extraction boundary;
-    24. P1 comes from aux["encoded"];
-    25. P2 comes from the first return value;
-    26. expected batch shape validation;
-    27. per-sample serialization shapes;
-    28. float32 NumPy output;
-    29. full 256-token preservation;
-    30. exact NPZ keys;
-    31. exact metadata fields;
-    32. duplicate path/sample rejection;
-    33. missing/invalid input rejection;
-    34. output collision rejection;
-    35. malformed model output rejection;
-    36. non-finite output rejection;
-    37. Pi05FeatureExtractionError chaining.
-    
-    ---
-    
-    ## Explicitly Deferred to Real C3 Smoke
-    
-    Unit tests must NOT claim to establish:
-    
-    - real pi05_libero checkpoint loading;
-    - actual released checkpoint backend;
-    - actual checkpoint norm-stat contents;
-    - actual checkpoint asset paths;
-    - real tokenizer numerical behavior;
-    - tokenizer asset downloading;
-    - real JAX/NNX runtime return structure;
-    - real model dtype behavior;
-    - real device placement;
-    - real sharding behavior;
-    - real P1/P2 numerical values;
-    - real P1/P2 shape confirmation against the released model;
-    - serialized-vs-direct numerical equality on the real model;
-    - complete real-policy transform numerical equivalence.
-    
-    These belong to the separate real C3 integration smoke.
-    
-    ---
-    
-    ## Integration Boundary
-    
-    Successful implementation and unit tests establish only:
-    
-        π0.5 representation extractor — unit-level PASS
-    
-    They do NOT establish:
-    
-        C3 fully closed
-    
-    A later real integration smoke must verify the released pi05_libero path end-to-end.
-    
-    Do not implement that smoke in this turn.
-    
-    ---
-    
-    ## Required Verification Before Completion
-    
-    Run at minimum:
-    
-        tests/test_pi05_features.py
-        tests/test_pilot_observation.py
-    
-    Also run existing relevant project tests if:
-    
-        shared_feature/__init__.py
-    
-    or other public exports are changed.
-    
-    Run Ruff on all changed Python files.
-    
-    Report:
-    
-    - files changed;
-    - implementation summary;
-    - exact test commands;
-    - test results;
-    - Ruff result;
-    - any OpenPI API assumptions discovered;
-    - any difference between contract expectations and actual local API;
-    - whether any file outside the allowed scope changed.
-    
-    ---
-    
-    ## Documentation
-    
-    Do not modify:
-    
-        docs/pilot-v0.1-spec.md
-    
-    during normal implementation.
-    
-    The preprocessing scientific design has already been corrected and frozen.
-    
-    Only report a documentation blocker if the implementation discovers a genuine contradiction with the actual OpenPI source.
-    
-    Do not alter research decisions during coding.
-    
-    Do not mark full C3 PASS.
-    
-    Maximum allowed status after successful completion:
-    
-        π0.5 representation extractor — unit-level PASS
-        C3 real π0.5 integration smoke — PENDING
-    
-    ---
-    
-    ## Stop Condition
-    
-    Stop when:
-    
-    1. raw PilotObservation inputs are validated;
-    2. official client-side LIBERO preprocessing is reproduced;
-    3. checkpoint-associated explicit norm_stats are used;
-    4. official pi05_libero server-side transforms are orchestrated from existing OpenPI objects;
-    5. transforms run per record before batching;
-    6. batched Observation construction matches official inference semantics;
-    7. batched preprocess_observation(train=False) is preserved;
-    8. P1/P2 are extracted through model.PaliGemma.img;
-    9. provenance and serialization match the frozen schema;
-    10. focused unit tests pass;
-    11. relevant existing tests remain green;
-    12. Ruff passes;
-    13. no forbidden scope was touched.
-    
-    If any requirement cannot be satisfied without:
-    
-    - modifying upstream OpenPI;
-    - changing the frozen scientific semantics;
-    - downloading the full checkpoint inside the extractor;
-    - inventing or silently substituting normalization statistics;
-    - bypassing required official preprocessing;
-    - duplicating OpenPI transform algorithms;
-    - duplicating SigLIP internals;
-    
-    STOP and report the blocker rather than expanding scope.
+Do not duplicate all feature tensors into a consolidated NPZ or another large artifact.
+
+The existing C2 and C3 feature archives remain the source feature artifacts.
+
+---
+
+### DECISION 6 — Deterministic Frozen Ordering
+
+The manifest pair order must be:
+
+    sorted(sample_id)
+
+using deterministic Python string ordering.
+
+Do not depend on:
+
+- filesystem glob order;
+- directory enumeration order;
+- file modification time;
+- archive filename order.
+
+Once written, the manifest is the canonical sample order for downstream Pilot analysis.
+
+---
+
+### DECISION 7 — Deterministic Relative Path Semantics
+
+All source archive paths and the manifest parent must be resolved before manifest construction.
+
+For every validated source archive:
+
+1. resolve the archive path;
+2. resolve the manifest parent directory;
+3. compute the archive path relative to the resolved manifest parent;
+4. serialize the result as a POSIX-style path string.
+
+Example:
+
+    resolved manifest:
+        /data/xiaomengqi/project/manifests/paired_features_manifest.json
+    
+    resolved archive:
+        /data/xiaomengqi/project/features/openvla/sample.npz
+    
+    manifest value:
+        ../features/openvla/sample.npz
+
+Do not serialize environment-specific absolute archive paths.
+
+Do not use an absolute-path fallback.
+
+If a deterministic relative path cannot be represented safely, fail loudly rather than changing path semantics.
+
+---
+
+### DECISION 8 — Output Creation Semantics
+
+All input archives and cross-model pairing constraints must be validated BEFORE creating output directories or writing the manifest.
+
+After validation succeeds:
+
+    output_path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+The final manifest must never overwrite an existing file.
+
+Use exclusive-create semantics for the final manifest.
+
+If writing fails after creating an incomplete file, clean up only the incomplete file created by this invocation.
+
+Do not delete unrelated files or directories.
+
+---
+
+### DECISION 9 — Checkpoint Provenance Validation
+
+Both OpenVLA and π0.5 metadata must contain:
+
+    checkpoint
+
+as a non-empty string.
+
+For OpenVLA:
+
+    any non-empty checkpoint provenance string is accepted.
+
+Do not require one exact local checkpoint path because C2 may record an environment-specific local checkpoint identifier.
+
+For π0.5 Pilot v0.1:
+
+    checkpoint must equal exactly:
+    
+        gs://openpi-assets/checkpoints/pi05_libero
+
+This C4 contract validates the frozen Pilot v0.1 target identity, not arbitrary π0.5 checkpoints.
+
+---
+
+### DECISION 10 — Feature Content Validation Scope
+
+C4 validates feature arrays only for:
+
+    exact expected shape
+    exact float32 dtype
+    finite values
+
+Do NOT add an all-zero feature rejection in C4.
+
+C2/C3 own feature-generation correctness.
+
+C4 owns:
+
+    schema
+    identity
+    provenance
+    pairing
+
+Do not expand C4 into feature-quality analysis.
+
+---
+
+## Allowed Production Files
+
+Prefer adding only:
+
+    shared_feature/paired_features.py
+
+and updating:
+
+    shared_feature/__init__.py
+
+Tests may add:
+
+    tests/test_paired_features.py
+
+Do not modify unrelated production files.
+
+Do not modify:
+
+    shared_feature/openvla_features.py
+    shared_feature/pi05_features.py
+    shared_feature/pilot_observation.py
+    docs/pilot-v0.1-spec.md
+    docs/research-map.md
+    ../openpi
+    ../openvla
+    ../LIBERO
+    ../tex3d
+    ../modified-tex3d
+
+unless a genuine contract contradiction is first reported.
+
+Documentation synchronization is a separate later task.
+
+---
+
+## Forbidden Scope
+
+Do not implement:
+
+- feature extraction;
+- model loading;
+- OpenVLA preprocessing;
+- π0.5 preprocessing;
+- LIBERO collection;
+- paired tensor stacking;
+- consolidated feature archives;
+- PCA / SVD;
+- CCA / SVCCA;
+- CKA;
+- regression;
+- shuffled-null experiments;
+- policy relevance;
+- attack loss;
+- Tex3D integration;
+- feature optimization;
+- train/test splitting;
+- data sampling for analysis;
+- plotting;
+- representation statistics;
+- model inference;
+- GPU-dependent validation.
+
+Do not reopen C2 or C3 scientific decisions.
+
+---
+
+## Public API
+
+Implement:
+
+    class PairedFeatureValidationError(RuntimeError):
+        ...
+
+and:
+
+    def build_paired_feature_manifest(
+        *,
+        openvla_feature_dir: str | Path,
+        pi05_feature_dir: str | Path,
+        output_path: str | Path,
+    ) -> Path:
+        ...
+
+Small private helpers are allowed.
+
+Do not expose unnecessary implementation internals.
+
+Do not add additional public APIs unless implementation reveals a genuine need.
+
+---
+
+## Input Directory Semantics
+
+The two inputs are directories containing already-produced feature archives:
+
+    openvla_feature_dir
+    pi05_feature_dir
+
+C4 must not recursively search arbitrary nested trees.
+
+Discover:
+
+    *.npz
+
+directly under each supplied directory.
+
+Reject:
+
+- missing directories;
+- non-directory paths;
+- empty feature directories;
+- malformed NPZ files;
+- duplicate sample IDs within one feature directory.
+
+Ignore unrelated non-NPZ files.
+
+Do not infer sample identity from filename.
+
+Resolve each source archive path before recording it.
+
+---
+
+## OpenVLA Archive Contract
+
+Each OpenVLA archive must contain exactly:
+
+    o1_siglip
+    o1_fused
+    o2_projected
+    metadata_json
+
+Expected arrays:
+
+    o1_siglip
+        shape = (256, 1152)
+        dtype = float32
+    
+    o1_fused
+        shape = (256, 2176)
+        dtype = float32
+    
+    o2_projected
+        shape = (256, 4096)
+        dtype = float32
+
+All feature arrays must be:
+
+    finite
+    non-empty by virtue of the required exact shapes
+
+Do not reject all-zero arrays solely because they are all zero.
+
+Do not pool, reshape, transpose, normalize, or otherwise alter feature arrays.
+
+---
+
+## OpenVLA Metadata Contract
+
+OpenVLA metadata_json must contain exactly:
+
+    sample_id
+    source_model
+    checkpoint
+    feature_schema_version
+    source_image_hash
+
+Require:
+
+    source_model == "openvla"
+
+Require:
+
+    feature_schema_version == "openvla_features_v1"
+
+Require:
+
+    sample_id
+
+to be a non-empty string.
+
+Require:
+
+    checkpoint
+
+to be a non-empty string.
+
+Do not require a specific OpenVLA checkpoint string.
+
+Require:
+
+    source_image_hash
+
+to match exactly:
+
+    sha256:<64 lowercase hexadecimal characters>
+
+The metadata sample_id is authoritative.
+
+Do not compare it with the filename stem.
+
+---
+
+## π0.5 Archive Contract
+
+Each π0.5 archive must contain exactly:
+
+    p1_siglip
+    p2_projected
+    metadata_json
+
+Expected arrays:
+
+    p1_siglip
+        shape = (256, 1152)
+        dtype = float32
+    
+    p2_projected
+        shape = (256, 2048)
+        dtype = float32
+
+All feature arrays must be:
+
+    finite
+    non-empty by virtue of the required exact shapes
+
+Do not reject all-zero arrays solely because they are all zero.
+
+Do not pool, reshape, transpose, normalize, or otherwise alter feature arrays.
+
+---
+
+## π0.5 Metadata Contract
+
+π0.5 metadata_json must contain exactly:
+
+    sample_id
+    source_model
+    checkpoint
+    feature_schema_version
+    source_image_hash
+
+Require:
+
+    source_model == "pi05"
+
+Require:
+
+    feature_schema_version == "pi05_features_v1"
+
+Require:
+
+    sample_id
+
+to be a non-empty string.
+
+Require:
+
+    checkpoint
+
+to equal exactly:
+
+    gs://openpi-assets/checkpoints/pi05_libero
+
+Require:
+
+    source_image_hash
+
+to match exactly:
+
+    sha256:<64 lowercase hexadecimal characters>
+
+The metadata sample_id is authoritative.
+
+Do not compare it with the filename stem.
+
+---
+
+## metadata_json Parsing
+
+Load all NPZ files using:
+
+    allow_pickle=False
+
+metadata_json must be:
+
+    a NumPy scalar
+    Unicode JSON text
+    valid JSON object
+
+Reject:
+
+- object arrays;
+- non-scalar metadata_json;
+- non-Unicode metadata_json;
+- malformed JSON;
+- non-object JSON;
+- missing metadata keys;
+- additional unexpected metadata keys;
+- checkpoint values that violate the model-specific rules.
+
+Do not mutate metadata.
+
+---
+
+## Sample Discovery
+
+For each directory:
+
+1. enumerate direct-child `*.npz` archives;
+2. resolve each archive path;
+3. validate each archive;
+4. extract metadata sample_id;
+5. construct:
+
+       sample_id -> validated archive record
+
+6. reject duplicate sample_id values.
+
+Do not assume:
+
+    archive filename stem == sample_id
+
+Do not validate filename/sample_id equality.
+
+Metadata sample_id is the only authoritative archive identity.
+
+---
+
+## Exact Sample-Set Validation
+
+After validating both directories, compute:
+
+    openvla_ids = set(...)
+    pi05_ids = set(...)
+
+Require:
+
+    openvla_ids == pi05_ids
+
+If not equal, raise:
+
+    PairedFeatureValidationError
+
+and report both:
+
+    missing_in_openvla
+    missing_in_pi05
+
+where:
+
+    missing_in_openvla = sorted(pi05_ids - openvla_ids)
+    missing_in_pi05    = sorted(openvla_ids - pi05_ids)
+
+Do not proceed with the intersection.
+
+Do not silently skip unmatched samples.
+
+---
+
+## Cross-Model Pair Validation
+
+For every sample_id in:
+
+    sorted(openvla_ids)
+
+retrieve:
+
+    openvla_record
+    pi05_record
+
+Require:
+
+    openvla_record.sample_id
+    ==
+    pi05_record.sample_id
+
+and:
+
+    openvla_record.source_image_hash
+    ==
+    pi05_record.source_image_hash
+
+If hashes differ, fail loudly and include:
+
+    sample_id
+    OpenVLA hash
+    π0.5 hash
+
+Do not recompute the raw-image hash in C4.
+
+C4 validates the provenance carried forward by C2 and C3.
+
+Raw PilotObservation archives are not required inputs to C4.
+
+---
+
+## Representation Pairing Semantics
+
+C4 validates the existence of the following scientific representation pairings:
+
+    O1-S ↔ P1
+
+where:
+
+    OpenVLA o1_siglip    shape (256,1152)
+    π0.5   p1_siglip     shape (256,1152)
+
+and:
+
+    O2 ↔ P2
+
+where:
+
+    OpenVLA o2_projected shape (256,4096)
+    π0.5   p2_projected  shape (256,2048)
+
+Also preserve availability of:
+
+    OpenVLA o1_fused     shape (256,2176)
+
+as a supplementary representation.
+
+C4 must not numerically compare these representations.
+
+Different feature dimensions are expected.
+
+---
+
+## Manifest Output
+
+Write exactly one manifest file to:
+
+    output_path
+
+Recommended filename:
+
+    paired_features_manifest.json
+
+The manifest must be UTF-8 JSON.
+
+Use deterministic serialization:
+
+    ensure_ascii=False
+    sort_keys=True
+    indent=2
+
+Do not use pickle.
+
+Do not write binary tensor data into the manifest.
+
+---
+
+## Manifest Schema
+
+Use:
+
+    schema_version = "paired_features_v1"
+
+Top-level structure:
+
+    {
+        "schema_version": "paired_features_v1",
+        "num_samples": N,
+        "pairs": [...]
+    }
+
+The top-level object must contain exactly:
+
+    schema_version
+    num_samples
+    pairs
+
+Each pair entry must contain exactly:
+
+    sample_id
+    source_image_hash
+    openvla_feature_path
+    pi05_feature_path
+
+Example:
+
+    {
+        "sample_id":
+            "libero_spatial__task02__state00__step0000",
+    
+        "source_image_hash":
+            "sha256:...",
+    
+        "openvla_feature_path":
+            "../features/openvla/example.npz",
+    
+        "pi05_feature_path":
+            "../features/pi05/example.npz"
+    }
+
+Do not duplicate:
+
+- feature tensors;
+- feature shapes;
+- feature dtypes;
+- checkpoint strings;
+- source_model;
+- feature schema versions;
+
+inside every pair.
+
+Those remain available in the validated source archives.
+
+---
+
+## Manifest Path Construction
+
+Before generating path strings:
+
+    resolved_manifest_parent = output_path.resolve(strict=False).parent
+
+For every validated source archive:
+
+    resolved_archive = archive_path.resolve(strict=True)
+
+Construct the manifest path using a deterministic relative-path operation from:
+
+    resolved_manifest_parent
+
+to:
+
+    resolved_archive
+
+Serialize the result using POSIX separators.
+
+The manifest must therefore remain independent of the original absolute environment prefix when the directory tree is moved as a unit.
+
+Do not store absolute archive paths.
+
+Do not provide an absolute fallback.
+
+---
+
+## Output Safety
+
+Before any filesystem mutation:
+
+1. validate both input directories;
+2. validate all OpenVLA archives;
+3. validate all π0.5 archives;
+4. validate exact sample-set equality;
+5. validate all cross-model source-image hashes;
+6. construct the complete manifest object in memory.
+
+Only after all validation succeeds:
+
+    output_path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+Reject if:
+
+    output_path.exists()
+
+Do not overwrite.
+
+Write the final manifest using exclusive-create semantics.
+
+If writing creates an incomplete final file and then fails:
+
+    remove only that incomplete final file
+
+if it can be identified safely as having been created by the current invocation.
+
+Do not delete pre-existing files.
+
+---
+
+## Deterministic Ordering
+
+The manifest pairs must appear in exactly:
+
+    sorted(sample_id)
+
+order.
+
+Require:
+
+    num_samples == len(pairs)
+
+Every sample_id must appear exactly once.
+
+This manifest ordering becomes the canonical downstream Pilot ordering.
+
+C5 and later stages must consume this order rather than rediscovering archives independently.
+
+---
+
+## Validation Summary
+
+The function does not need to print extensively.
+
+However, successful completion must imply:
+
+    OpenVLA samples: N
+    π0.5 samples: N
+    matched sample IDs: N
+    matched source hashes: N
+    hash mismatches: 0
+    missing in OpenVLA: 0
+    missing in π0.5: 0
+
+Do not add a second report artifact in C4.
+
+The paired manifest is the required output artifact.
+
+---
+
+## Error Handling
+
+Raise:
+
+    PairedFeatureValidationError
+
+for C4 validation and external-boundary failures.
+
+Appropriate failures include:
+
+- missing input directory;
+- input path is not a directory;
+- empty feature directory;
+- malformed NPZ;
+- unexpected NPZ keys;
+- malformed metadata_json;
+- metadata schema mismatch;
+- wrong source_model;
+- wrong feature_schema_version;
+- malformed sample_id;
+- malformed checkpoint provenance;
+- wrong π0.5 checkpoint;
+- malformed source_image_hash;
+- duplicate sample_id;
+- wrong feature shape;
+- wrong feature dtype;
+- non-finite features;
+- unequal cross-model sample sets;
+- cross-model source-image hash mismatch;
+- relative-path construction failure;
+- output collision;
+- manifest serialization failure.
+
+If a PairedFeatureValidationError already exists internally, propagate it unchanged.
+
+Wrap external I/O, NumPy, JSON, and filesystem failures with exception chaining where appropriate.
+
+Do not silently skip bad archives.
+
+---
+
+## Unit-Test Strategy
+
+Use focused tests rather than one test function per checklist item.
+
+Mocks are not necessary for most C4 behavior.
+
+Tests should construct small temporary NPZ archives using real NumPy serialization.
+
+Do not depend on:
+
+- OpenPI;
+- OpenVLA;
+- JAX;
+- PyTorch;
+- CUDA;
+- LIBERO.
+
+---
+
+## Unit-Level Behaviors to Verify
+
+Tests should collectively cover:
+
+1. successful pairing of multiple valid OpenVLA and π0.5 archives;
+2. deterministic sorted metadata sample_id ordering;
+3. filename stem is NOT required to equal sample_id;
+4. exact sample-set equality;
+5. matching source_image_hash requirement;
+6. OpenVLA exact archive keys;
+7. π0.5 exact archive keys;
+8. OpenVLA expected feature shapes;
+9. π0.5 expected feature shapes;
+10. float32 dtype requirement;
+11. finite feature requirement;
+12. all-zero finite arrays are not rejected solely for being zero;
+13. OpenVLA metadata schema;
+14. π0.5 metadata schema;
+15. source_model validation;
+16. feature_schema_version validation;
+17. OpenVLA non-empty checkpoint requirement;
+18. π0.5 exact checkpoint requirement;
+19. malformed metadata JSON rejection;
+20. non-scalar metadata_json rejection;
+21. non-Unicode metadata_json rejection;
+22. malformed source-image hash rejection;
+23. duplicate sample_id rejection within OpenVLA;
+24. duplicate sample_id rejection within π0.5;
+25. missing sample on either side;
+26. explicit reporting of missing_in_openvla;
+27. explicit reporting of missing_in_pi05;
+28. hash mismatch rejection;
+29. non-NPZ files are ignored;
+30. empty feature directory rejection;
+31. missing directory rejection;
+32. output collision rejection;
+33. exact manifest top-level schema;
+34. exact per-pair manifest fields;
+35. manifest archive paths are relative;
+36. manifest archive paths use POSIX separators;
+37. manifest paths resolve back to the exact validated source archives;
+38. num_samples consistency;
+39. output file is valid UTF-8 JSON;
+40. output parent is created only after successful input validation;
+41. source feature archives remain unchanged.
+
+---
+
+## Required Happy-Path Test
+
+Construct at least three samples with deliberately unrelated archive filenames, for example:
+
+    z_file.npz -> metadata sample-b
+    a_file.npz -> metadata sample-c
+    m_file.npz -> metadata sample-a
+
+on each model side.
+
+The test must succeed.
+
+Verify manifest order:
+
+    sample-a
+    sample-b
+    sample-c
+
+based only on metadata sample_id.
+
+Verify every pair carries the expected shared source_image_hash.
+
+Verify stored source paths are relative POSIX paths from the manifest parent.
+
+Verify those paths resolve back to the exact source archives.
+
+---
+
+## Required Sample-Set Failure Test
+
+Construct:
+
+    OpenVLA:
+        sample-a
+        sample-b
+        sample-c
+    
+    π0.5:
+        sample-a
+        sample-c
+        sample-d
+
+Require failure reporting:
+
+    missing_in_openvla = ["sample-d"]
+    missing_in_pi05    = ["sample-b"]
+
+Do not allow a two-sample intersection manifest to be created.
+
+---
+
+## Required Hash-Mismatch Test
+
+Construct valid archives with:
+
+    sample_id == "sample-a"
+
+on both sides but:
+
+    OpenVLA source_image_hash = hash_A
+    π0.5   source_image_hash = hash_B
+
+Require:
+
+    PairedFeatureValidationError
+
+and include:
+
+    sample-a
+    hash_A
+    hash_B
+
+in the error context.
+
+---
+
+## Required Checkpoint Tests
+
+Verify:
+
+OpenVLA:
+
+    checkpoint = "/some/local/openvla/checkpoint"
+
+is accepted if non-empty.
+
+Reject:
+
+    checkpoint = ""
+    checkpoint = null
+    checkpoint = numeric value
+
+For π0.5 accept only:
+
+    gs://openpi-assets/checkpoints/pi05_libero
+
+Reject:
+
+    ""
+    null
+    numeric values
+    gs://openpi-assets/checkpoints/pi05_base
+    arbitrary local checkpoint strings
+
+---
+
+## Integration Boundary
+
+C4 does not require a GPU/model smoke.
+
+A successful implementation plus unit tests establishes:
+
+    C4 paired-feature manifest builder — UNIT-LEVEL PASS
+
+Before using the manifest for scientific C5 analysis, perform one lightweight real-artifact validation using existing C2 and C3 feature directories.
+
+That validation must:
+
+1. run the production C4 manifest builder;
+2. use real C2 OpenVLA feature artifacts;
+3. use real C3 π0.5 feature artifacts;
+4. confirm full sample-set equality;
+5. confirm all source hashes match;
+6. inspect the resulting manifest;
+7. resolve every manifest path back to its source archive.
+
+This real-artifact validation does not require model inference.
+
+Do not rerun OpenVLA or π0.5 models for C4.
+
+---
+
+## Required Verification Before Completion
+
+Run at minimum:
+
+    tests/test_paired_features.py
+
+Also run:
+
+    tests/test_openvla_features.py
+    tests/test_pi05_features.py
+
+if public package exports are changed.
+
+Run the complete project test suite if practical.
+
+Run Ruff on:
+
+    shared_feature/paired_features.py
+    shared_feature/__init__.py
+    tests/test_paired_features.py
+
+Report:
+
+- files changed;
+- implementation summary;
+- public API;
+- test commands;
+- test results;
+- Ruff result;
+- manifest schema;
+- exact path-storage semantics;
+- checkpoint-validation semantics;
+- any contract mismatch discovered;
+- whether any forbidden file changed.
+
+---
+
+## Documentation
+
+Do not modify:
+
+    docs/pilot-v0.1-spec.md
+    docs/research-map.md
+
+during this coding task.
+
+Their stale status / historical π0 wording is a known non-blocking documentation issue.
+
+Documentation synchronization will be handled in a separate task.
+
+If implementation reveals a genuine contradiction with C2/C3 artifact schemas, STOP and report it before changing documentation or source extractors.
+
+---
+
+## Maximum Status After Coding
+
+Successful implementation and tests may establish:
+
+    C4 paired-feature manifest builder — UNIT-LEVEL PASS
+
+Do not yet claim:
+
+    C4 Paired Feature Dataset — PASS
+
+until the real-artifact validation is completed.
+
+Do not claim:
+
+    shared representation discovered
+    transferable representation discovered
+    policy-relevant representation discovered
+
+Those are later scientific conclusions.
+
+---
+
+## Real-Artifact Follow-Up
+
+After the unit-level implementation is accepted, run a separate lightweight real-artifact C4 validation.
+
+Expected successful result:
+
+    OpenVLA sample count == π0.5 sample count
+    sample sets identical
+    all source_image_hash values identical pairwise
+    manifest written successfully
+    all relative manifest paths resolve correctly
+
+After that validation:
+
+    C4 Paired Feature Dataset — PASS
+
+Then C5 may begin.
+
+---
+
+## Stop Condition
+
+Stop when:
+
+1. both feature directories are strictly validated;
+2. exact cross-model sample-set equality is enforced;
+3. every pair is validated by metadata sample_id and source_image_hash;
+4. all expected feature schemas are validated;
+5. checkpoint provenance rules are enforced;
+6. deterministic sample ordering is frozen;
+7. deterministic relative manifest paths are written;
+8. the lightweight manifest is written;
+9. focused unit tests pass;
+10. relevant existing tests remain green;
+11. Ruff passes;
+12. no representation analysis has been added.
+
+If satisfying C4 would require:
+
+- changing C2 or C3 feature semantics;
+- modifying source extractors;
+- recomputing representations;
+- silently dropping unmatched samples;
+- ignoring provenance mismatches;
+- accepting arbitrary π0.5 checkpoint provenance;
+- introducing PCA / CCA / CKA / regression;
+- copying all feature tensors into a new dataset;
+
+STOP and report the blocker rather than expanding scope.
