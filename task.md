@@ -1,1197 +1,1056 @@
-# C4 Coding Contract — Paired Feature Dataset Manifest
+# C5-D0 Coding Contract — Pilot-200 Scientific Dataset Collection
 
 ## Goal
 
-Implement the Pilot v0.1 paired-feature dataset validator and manifest builder.
+Implement the formal Pilot-200 observation dataset collector used to prepare
+scientific data for C5 shared-representation analysis.
 
-C4 must establish a scientifically valid one-to-one correspondence between the already extracted:
+This milestone does NOT perform C5 representation analysis.
 
-    OpenVLA feature artifacts
+Its purpose is to construct a balanced, auditable, deterministic set of
+real LIBERO-Spatial observations collected from successful clean OpenVLA
+rollouts.
 
-and:
+The target dataset is:
 
-    π0.5 feature artifacts
+    LIBERO-Spatial
+    all 10 tasks, subject to runtime verification
+    × 5 accepted initial-state groups per task
+    × 4 observations per accepted trajectory
+    = target 200 PilotObservations
 
-before any cross-model representation analysis begins.
+The four observations from each accepted trajectory correspond to
+predefined relative trajectory progress targets:
 
-The purpose of C4 is to answer:
+    0.10
+    0.40
+    0.70
+    0.90
 
-    Do the OpenVLA and π0.5 feature archives refer to exactly
-    the same Pilot observations, with valid feature schemas and
-    matching raw-image provenance?
+The resulting PilotObservations will later be consumed independently by:
 
-C4 must:
+    C2 OpenVLA feature extraction
+    C3 π0.5 feature extraction
+    C4 paired-feature validation
+    C5 statistical analysis
 
-1. discover OpenVLA feature archives;
-2. discover π0.5 feature archives;
-3. validate both feature schemas;
-4. require exact equality of the two sample sets;
-5. pair samples by metadata sample_id;
-6. verify source_image_hash equality for every pair;
-7. freeze a deterministic sample order;
-8. write a lightweight paired-feature manifest.
-
-C4 must NOT perform any representation-similarity analysis.
+This milestone must not perform any of those later stages.
 
 ---
 
 ## Current Project Status
 
-Already closed:
+Closed:
 
     C0 PilotObservation schema                   PASS
+    
     C1 LIBERO observation collector              PASS
     C1 real OpenVLA/LIBERO smoke                 PASS
+    
     C2 OpenVLA feature extractor                 PASS
     C2 real OpenVLA/GPU smoke                    PASS
+    
     C3 π0.5 feature extractor                    PASS
     C3 real π0.5 integration smoke               PASS
+    
+    C4 paired-feature manifest builder           UNIT-LEVEL PASS
+    C4 real-artifact smoke validation            PASS
 
-C3 canonical scientific extraction is frozen to:
-
-    batch_size = 1
-
-for Pilot v0.1 π0.5 feature generation.
-
-The optional batch-size>1 numerical mismatch observed during C3 smoke is an engineering note and is not part of C4.
-
----
-
-## Frozen C4 Decisions
-
-### DECISION 1 — Exact Sample-Set Equality
-
-C4 requires:
-
-    set(OpenVLA sample_ids)
-    ==
-    set(π0.5 sample_ids)
-
-Do not silently use only the intersection.
-
-If either side contains unmatched samples, validation must fail and report the missing IDs.
+C5 scientific methodology has been designed, but the current real
+C2/C3/C4 artifacts contain only two smoke observations and must NOT be
+used for scientific C5 conclusions.
 
 ---
 
-### DECISION 2 — Pair Identity
+# Scientific Dataset Decisions
 
-A valid cross-model pair requires BOTH:
+## DECISION 1 — Suite
 
-    OpenVLA.sample_id == π0.5.sample_id
+Pilot-200 uses:
 
-and:
+    LIBERO-Spatial only
 
-    OpenVLA.source_image_hash
-    ==
-    π0.5.source_image_hash
+Do not mix LIBERO-Object, LIBERO-Goal, LIBERO-10, or other suites into
+this first Pilot dataset.
 
-Matching filenames alone are insufficient.
-
-Matching sample_id alone is insufficient.
-
-The source_image_hash is the cross-model proof that both representations originate from the same raw:
-
-    PilotObservation.base_rgb_raw
+The first Pilot must keep the OpenVLA policy/checkpoint family fixed.
 
 ---
 
-### DECISION 3 — Metadata sample_id Is Authoritative
+## DECISION 2 — Task Coverage
 
-Do not require:
+The intended design is to cover all LIBERO-Spatial tasks.
 
-    filename stem == metadata.sample_id
+The currently expected count is:
 
-Archive filenames are storage details.
+    10 tasks
 
-The metadata field:
+but task count MUST be verified from the real official LIBERO runtime
+before hardcoding availability assumptions.
+
+If the real runtime does not expose the expected task count:
+
+    STOP
+
+and report the exact discovered task availability.
+
+Do not silently substitute another suite or task subset.
+
+---
+
+## DECISION 3 — Dataset Structure
+
+Target:
+
+    5 accepted initial-state groups per task
+
+Each accepted group contributes:
+
+    exactly 4 observations
+
+Target total:
+
+    10 tasks
+    × 5 groups/task
+    × 4 observations/group
+    = 200 observations
+
+Target groups:
+
+    50
+
+---
+
+## DECISION 4 — Balanced Task Contribution
+
+Target contribution per task:
+
+    5 accepted groups
+    20 observations
+
+Do not compensate for a difficult task by:
+
+- oversampling another task;
+- taking more than four observations from another trajectory;
+- duplicating observations;
+- adding dense adjacent frames.
+
+Rejected states may only be replaced by later candidate states from the
+same task.
+
+---
+
+## DECISION 5 — Minimum Dataset Usability
+
+Preferred dataset:
+
+    5 accepted groups per task
+    50 total groups
+    200 observations
+
+Minimum acceptable Pilot coverage:
+
+    at least 4 accepted groups for EVERY task
+    at least 40 accepted groups total
+    exactly 4 observations per accepted group
+
+If any task has fewer than four accepted groups after candidate states
+are exhausted:
+
+    Pilot-200 dataset preparation is BLOCKED.
+
+Do not begin C5 scientific analysis.
+
+A dataset with small quota shortfall may later contain fewer than
+200 observations, but the shortfall must be explicit and auditable.
+
+---
+
+# Rollout Distribution
+
+## DECISION 6 — Rollout Source
+
+Formal Pilot observations come from:
+
+    successful clean OpenVLA policy rollouts
+
+The same frozen raw observations are later supplied independently to
+OpenVLA and π0.5 feature extraction.
+
+Do NOT generate separate observation datasets from OpenVLA and π0.5
+rollouts.
+
+The Pilot therefore samples the state distribution visited by successful
+clean OpenVLA trajectories.
+
+This is an explicit scientific limitation and must be preserved in
+provenance.
+
+---
+
+## DECISION 7 — Successful Trajectories Only
+
+Only trajectories for which the official LIBERO environment reports
+success are accepted into Pilot-200.
+
+The authoritative success mechanism remains the official/public
+environment success check already used by the validated C1 collector.
+
+A normal unsuccessful clean-policy rollout is:
+
+    a rejected candidate group
+
+not automatically an infrastructure exception.
+
+Examples of rejected candidate outcomes:
+
+    policy_failure
+    trajectory_too_short
+    sampling_index_collision
+
+Infrastructure or schema failures remain errors.
+
+Examples:
+
+    environment initialization error
+    malformed observation
+    invalid OpenVLA action
+    serialization error
+    schema validation failure
+
+Do not conflate policy failure with infrastructure failure.
+
+---
+
+# Observation Sampling
+
+## DECISION 8 — Relative Progress Targets
+
+For every accepted successful trajectory, collect exactly four
+observations corresponding to:
+
+    0.10
+    0.40
+    0.70
+    0.90
+
+of the valid policy trajectory.
+
+Do not use the existing C1 uniform 20-frame sampling policy for
+Pilot-200.
+
+Do not use:
+
+    trajectory start = 0.0
+
+or:
+
+    exact terminal = 1.0
+
+as formal Pilot-200 target points.
+
+---
+
+## DECISION 9 — Full Trajectory First
+
+The complete successful trajectory must be collected before formal
+sampling indices are chosen.
+
+Sampling therefore follows:
+
+    collect complete trajectory
+    determine T
+    compute four target indices
+    validate four unique indices
+    construct four PilotObservations
+
+Do not sample formal Pilot-200 observations online before the trajectory
+length is known.
+
+---
+
+## DECISION 10 — Sampling Index Rule
+
+For target relative progress:
+
+    q in {0.10, 0.40, 0.70, 0.90}
+
+choose the deterministic nearest simulator timestep to:
+
+    q * (T - 1)
+
+Use one explicitly implemented deterministic rounding convention.
+
+Recommended:
+
+    floor(q * (T - 1) + 0.5)
+
+The implementation must use one frozen rule for every task/state.
+
+Do not adapt sampling percentages by task.
+
+---
+
+## DECISION 11 — Unique Real Timesteps
+
+The four target progress values must map to four distinct real
+trajectory indices.
+
+If they do not:
+
+    reject the candidate group
+
+Do not:
+
+- duplicate frames;
+- perturb sampling percentages;
+- search arbitrary nearby steps;
+- reduce the group to three observations.
+
+Every accepted group contributes exactly four real observations.
+
+---
+
+# Sample Identity and PilotObservation
+
+## DECISION 12 — Preserve Existing PilotObservation Semantics
+
+Do NOT change the PilotObservation schema.
+
+Preserve existing semantics for:
 
     sample_id
+    task_id
+    initial_state_id
+    episode_id
+    step_id
+    normalized_episode_progress
+    base_rgb_raw
+    wrist_rgb_raw
+    state
+    prompt
+    episode_success
 
-is the authoritative identity used for:
+Raw image semantics must remain unchanged.
 
-- duplicate detection;
-- sample-set equality;
-- cross-model pairing;
-- deterministic manifest ordering.
-
-A valid archive may have a filename unrelated to its sample_id.
-
-Do not silently rewrite or infer sample_id from the filename.
+Do not preprocess raw images before serialization.
 
 ---
 
-### DECISION 4 — No Representation Analysis
+## DECISION 13 — Sample ID Grammar
 
-C4 must not perform:
+Preserve the existing sample ID grammar:
 
-- mean pooling;
-- max pooling;
-- CLS-style pooling;
-- token pooling;
-- feature flattening for analysis;
+    libero_spatial__taskXX__stateYY__stepZZZZ
+
+where:
+
+    XX = real task ID
+    YY = real official initial-state ID
+    ZZZZ = real policy-trajectory simulator step ID
+
+Do not replace real step identity with:
+
+    quantile01
+    progress40
+    sample3
+
+or other synthetic aliases.
+
+---
+
+## DECISION 14 — Actual vs Target Progress
+
+PilotObservation continues to store the actual:
+
+    normalized_episode_progress
+
+derived from the selected real step and actual trajectory length.
+
+The new collection manifest separately records:
+
+    target_relative_progress
+
+Example:
+
+    target_relative_progress = 0.40
+    actual normalized progress = 0.3978
+
+Do not overwrite actual progress with the target fraction.
+
+---
+
+# Existing C1 Collector Boundary
+
+## DECISION 15 — Existing C1 Is Already Validated
+
+The existing:
+
+    shared_feature/libero_collector.py
+
+contains validated low-level OpenVLA/LIBERO rollout behavior.
+
+Do not redesign or duplicate:
+
+- official LIBERO environment setup;
+- initial-state reset semantics;
+- dummy-step behavior;
+- OpenVLA policy preprocessing;
+- get_action semantics;
+- gripper normalization;
+- gripper inversion;
+- raw observation capture;
+- canonical 8D state generation;
+- official success detection.
+
+---
+
+## DECISION 16 — Backward Compatibility
+
+Existing public API:
+
+    collect_pilot_observations(...)
+
+must remain behaviorally backward-compatible.
+
+Existing C1 tests and smoke semantics must remain valid.
+
+Pilot-200 must not silently redefine the existing C1 collector from:
+
+    fixed-task generic Pilot collection
+
+into:
+
+    multi-task success-only Pilot-200 collection.
+
+---
+
+## DECISION 17 — New High-Level Orchestration Layer
+
+Pilot-200 must be implemented as a new higher-level dataset collection
+layer.
+
+Recommended production module:
+
+    shared_feature/pilot200_collector.py
+
+Recommended public API:
+
+    class Pilot200CollectionError(RuntimeError):
+        ...
+    
+    def collect_pilot200_observations(
+        *,
+        model,
+        processor,
+        pretrained_checkpoint: str | Path,
+        output_dir: str | Path,
+        manifest_path: str | Path,
+        unnorm_key: str | None = None,
+        center_crop: bool = True,
+    ) -> tuple[Path, ...]:
+        ...
+
+A small return dataclass may be proposed only if clearly necessary.
+
+Do not expose many additional public APIs.
+
+---
+
+## DECISION 18 — Reuse Low-Level Rollout Logic
+
+Do not copy the low-level rollout implementation into
+pilot200_collector.py.
+
+A minimal refactor of:
+
+    shared_feature/libero_collector.py
+
+is allowed only if required to expose reusable internal functionality.
+
+Any such refactor must:
+
+1. preserve collect_pilot_observations() behavior;
+2. preserve existing C1 public API;
+3. preserve existing C1 tests;
+4. preserve existing real-smoke semantics;
+5. introduce no scientific-policy changes into the low-level primitive.
+
+If code reuse would require a risky C1 redesign:
+
+    STOP
+
+and report the design blocker.
+
+---
+
+# Runtime Availability Audit
+
+## Required Real-Runtime Audit Before Finalizing Availability Constants
+
+Before freezing task/state iteration constants, inspect the official
+LIBERO-Spatial runtime and determine:
+
+    actual task count
+
+and for every task:
+
+    number of official initial states
+
+Report these values.
+
+Do not assume availability from historical documentation alone.
+
+The high-level collector should preferably derive availability from
+the official runtime rather than hardcoding arbitrary state limits such as:
+
+    tuple(range(10))
+
+if more official initial states exist.
+
+---
+
+# Candidate-State Traversal
+
+## DECISION 19 — Deterministic State Order
+
+For every task, candidate official initial states are visited in
+deterministic ascending state-ID order:
+
+    state00
+    state01
+    state02
+    ...
+
+unless the official runtime exposes a different frozen canonical
+ordering.
+
+Do not randomly shuffle candidate states.
+
+Do not visually inspect states and select preferred examples.
+
+---
+
+## DECISION 20 — Quota Filling
+
+For each task:
+
+    accepted_groups = []
+
+Iterate candidate states deterministically.
+
+For each candidate:
+
+1. collect one clean OpenVLA trajectory;
+2. classify runtime outcome;
+3. require official success;
+4. derive four frozen progress samples;
+5. validate the four PilotObservations;
+6. write the group transactionally;
+7. mark the state accepted;
+8. stop once 5 groups have been accepted.
+
+Rejected states remain part of the collection census.
+
+---
+
+# Group Acceptance Contract
+
+A candidate `(task_id, initial_state_id)` is accepted only if:
+
+1. official environment/task initialization succeeds;
+2. valid clean OpenVLA rollout is produced;
+3. official task success is true;
+4. trajectory supports four unique frozen sampling indices;
+5. all four raw observations satisfy existing C1/PilotObservation rules;
+6. all four sample IDs are unique;
+7. no destination collisions exist;
+8. all four records can be serialized successfully.
+
+Anything less does not form an accepted group.
+
+---
+
+# Transactional Group Writing
+
+Before writing one accepted group:
+
+1. construct all four PilotObservation records;
+2. determine all four output paths;
+3. validate all records;
+4. verify no output path exists;
+5. verify no sample ID collision exists.
+
+Then write the four artifacts.
+
+If writing fails partway through:
+
+    remove only files created by the current group write
+
+when safe to do so.
+
+Do not leave a group partially represented in the canonical dataset.
+
+Do not delete pre-existing artifacts.
+
+---
+
+# Output Directory
+
+The observation output directory contains only canonical accepted
+PilotObservation NPZ files for this collection run.
+
+Do not store rejected trajectories as canonical PilotObservation files.
+
+The collector may create necessary parent directories only after
+configuration/runtime validation succeeds.
+
+Do not silently overwrite an existing observation artifact.
+
+---
+
+# Collection Manifest
+
+## Required Artifact
+
+Pilot-200 must produce one human-readable UTF-8 JSON collection manifest.
+
+Recommended schema version:
+
+    pilot200_collection_v1
+
+The manifest is the authoritative dataset-level source for:
+
+    task identity
+    initial-state grouping
+    trajectory acceptance/rejection
+    target relative progress
+    coverage census
+
+It complements PilotObservation metadata.
+
+It does not replace C4 paired-feature manifest.
+
+---
+
+## Manifest Top-Level Information
+
+The manifest should include at least:
+
+    schema_version
+    suite
+    rollout_policy
+    pretrained_checkpoint
+    unnorm_key
+    center_crop
+    
+    target_groups_per_task
+    observations_per_group
+    target_relative_progress
+    
+    discovered_task_count
+    target_total_groups
+    target_total_observations
+    
+    actual_total_groups
+    actual_total_observations
+    
+    task_results
+
+Do not include feature tensors.
+
+---
+
+## Per-Task Census
+
+Each task entry must preserve at least:
+
+    task_id
+    task_language
+    available_initial_state_count
+    target_accepted_groups
+    actual_accepted_groups
+    attempted_state_ids
+    accepted_state_ids
+    rejected_states
+
+---
+
+## Rejected-State Record
+
+Each rejected state record must contain at least:
+
+    initial_state_id
+    reason
+
+Prefer stable rejection reason codes such as:
+
+    policy_failure
+    trajectory_too_short
+    sampling_index_collision
+
+Infrastructure exceptions should not be silently converted into ordinary
+policy_failure records.
+
+---
+
+## Accepted-Group Record
+
+Each accepted group must contain at least:
+
+    task_id
+    initial_state_id
+    trajectory_length
+    episode_success
+    samples
+
+Require:
+
+    episode_success == true
+
+---
+
+## Per-Sample Collection Record
+
+For each of the four observations record at least:
+
+    sample_id
+    step_id
+    target_relative_progress
+    actual_normalized_episode_progress
+    observation_path
+
+The manifest may use deterministic paths relative to the manifest parent.
+
+If paths are stored, use one frozen relative POSIX-path policy.
+
+---
+
+# Collection Manifest Ordering
+
+Manifest ordering must be deterministic.
+
+Recommended:
+
+    tasks sorted by task_id
+    attempted states in actual deterministic traversal order
+    accepted groups in state-ID traversal order
+    samples ordered by target progress:
+        0.10
+        0.40
+        0.70
+        0.90
+
+Do not rely on filesystem enumeration ordering.
+
+---
+
+# Completeness Status
+
+The manifest must make it possible to derive one of:
+
+    COMPLETE
+    USABLE_WITH_SHORTFALL
+    BLOCKED
+
+Recommended semantics:
+
+COMPLETE:
+
+    every task has 5 accepted groups
+    total groups = 50
+    total observations = 200
+
+USABLE_WITH_SHORTFALL:
+
+    every task has >= 4 accepted groups
+    total groups >= 40
+    exactly 4 observations per accepted group
+    but at least one task has fewer than 5 groups
+
+BLOCKED:
+
+    any task has fewer than 4 accepted groups
+    or total groups < 40
+    or accepted group integrity is violated
+
+Do not call a shortfall dataset COMPLETE.
+
+---
+
+# No C5 Split During Collection
+
+Do NOT decide train/held-out membership during collection.
+
+The sequence is:
+
+    collect and freeze canonical dataset
+    THEN
+    construct C2/C3/C4 artifacts
+    THEN
+    create C5 group-aware split
+
+Collection decisions must not depend on downstream held-out results.
+
+---
+
+# Forbidden Scope
+
+Do not implement:
+
+- OpenVLA feature extraction;
+- π0.5 feature extraction;
+- C4 paired-feature construction;
+- train/held-out splitting;
 - PCA;
 - SVD;
 - CCA;
 - SVCCA;
 - CKA;
-- cosine similarity;
-- Euclidean similarity analysis;
-- linear regression;
-- R²;
-- canonical correlation;
-- shuffled-null analysis;
-- train / held-out splitting.
+- regression;
+- shuffled null;
+- representation similarity;
+- plotting;
+- attack objectives;
+- Tex3D integration;
+- policy relevance;
+- adversarial transfer testing.
 
-Those belong to later milestones.
-
----
-
-### DECISION 5 — Manifest Only
-
-C4 produces a lightweight manifest.
-
-Do not duplicate all feature tensors into a consolidated NPZ or another large artifact.
-
-The existing C2 and C3 feature archives remain the source feature artifacts.
+Do not modify OpenVLA/OpenPI/LIBERO external repositories.
 
 ---
 
-### DECISION 6 — Deterministic Frozen Ordering
+# Allowed Production Changes
 
-The manifest pair order must be:
+Preferred:
 
-    sorted(sample_id)
-
-using deterministic Python string ordering.
-
-Do not depend on:
-
-- filesystem glob order;
-- directory enumeration order;
-- file modification time;
-- archive filename order.
-
-Once written, the manifest is the canonical sample order for downstream Pilot analysis.
-
----
-
-### DECISION 7 — Deterministic Relative Path Semantics
-
-All source archive paths and the manifest parent must be resolved before manifest construction.
-
-For every validated source archive:
-
-1. resolve the archive path;
-2. resolve the manifest parent directory;
-3. compute the archive path relative to the resolved manifest parent;
-4. serialize the result as a POSIX-style path string.
-
-Example:
-
-    resolved manifest:
-        /data/xiaomengqi/project/manifests/paired_features_manifest.json
-    
-    resolved archive:
-        /data/xiaomengqi/project/features/openvla/sample.npz
-    
-    manifest value:
-        ../features/openvla/sample.npz
-
-Do not serialize environment-specific absolute archive paths.
-
-Do not use an absolute-path fallback.
-
-If a deterministic relative path cannot be represented safely, fail loudly rather than changing path semantics.
-
----
-
-### DECISION 8 — Output Creation Semantics
-
-All input archives and cross-model pairing constraints must be validated BEFORE creating output directories or writing the manifest.
-
-After validation succeeds:
-
-    output_path.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-The final manifest must never overwrite an existing file.
-
-Use exclusive-create semantics for the final manifest.
-
-If writing fails after creating an incomplete file, clean up only the incomplete file created by this invocation.
-
-Do not delete unrelated files or directories.
-
----
-
-### DECISION 9 — Checkpoint Provenance Validation
-
-Both OpenVLA and π0.5 metadata must contain:
-
-    checkpoint
-
-as a non-empty string.
-
-For OpenVLA:
-
-    any non-empty checkpoint provenance string is accepted.
-
-Do not require one exact local checkpoint path because C2 may record an environment-specific local checkpoint identifier.
-
-For π0.5 Pilot v0.1:
-
-    checkpoint must equal exactly:
-    
-        gs://openpi-assets/checkpoints/pi05_libero
-
-This C4 contract validates the frozen Pilot v0.1 target identity, not arbitrary π0.5 checkpoints.
-
----
-
-### DECISION 10 — Feature Content Validation Scope
-
-C4 validates feature arrays only for:
-
-    exact expected shape
-    exact float32 dtype
-    finite values
-
-Do NOT add an all-zero feature rejection in C4.
-
-C2/C3 own feature-generation correctness.
-
-C4 owns:
-
-    schema
-    identity
-    provenance
-    pairing
-
-Do not expand C4 into feature-quality analysis.
-
----
-
-## Allowed Production Files
-
-Prefer adding only:
-
-    shared_feature/paired_features.py
-
-and updating:
-
+    shared_feature/pilot200_collector.py
     shared_feature/__init__.py
+
+A minimal compatibility-preserving modification to:
+
+    shared_feature/libero_collector.py
+
+is allowed only if needed for safe low-level rollout reuse.
 
 Tests may add:
 
-    tests/test_paired_features.py
+    tests/test_pilot200_collector.py
 
-Do not modify unrelated production files.
+If libero_collector.py is changed, existing:
 
-Do not modify:
+    tests/test_libero_collector.py
 
-    shared_feature/openvla_features.py
-    shared_feature/pi05_features.py
-    shared_feature/pilot_observation.py
-    docs/pilot-v0.1-spec.md
-    docs/research-map.md
-    ../openpi
-    ../openvla
-    ../LIBERO
-    ../tex3d
-    ../modified-tex3d
+must remain green.
 
-unless a genuine contract contradiction is first reported.
-
-Documentation synchronization is a separate later task.
+Avoid modifying unrelated files.
 
 ---
 
-## Forbidden Scope
+# Engineering Constraints
 
-Do not implement:
+## Preserve Validated Observation Semantics
 
-- feature extraction;
-- model loading;
-- OpenVLA preprocessing;
-- π0.5 preprocessing;
-- LIBERO collection;
-- paired tensor stacking;
-- consolidated feature archives;
-- PCA / SVD;
-- CCA / SVCCA;
-- CKA;
-- regression;
-- shuffled-null experiments;
-- policy relevance;
-- attack loss;
-- Tex3D integration;
-- feature optimization;
-- train/test splitting;
-- data sampling for analysis;
-- plotting;
-- representation statistics;
-- model inference;
-- GPU-dependent validation.
+Formal accepted samples must continue to use the frozen:
 
-Do not reopen C2 or C3 scientific decisions.
+    PilotObservation
+
+implementation.
+
+Do not create a parallel NPZ schema.
 
 ---
 
-## Public API
+## No Model-Specific Feature Work
 
-Implement:
+The collector uses OpenVLA only as the clean rollout policy.
 
-    class PairedFeatureValidationError(RuntimeError):
-        ...
+It must not extract or save:
 
-and:
+    O1-S
+    O1-F
+    O2
+    P1
+    P2
 
-    def build_paired_feature_manifest(
-        *,
-        openvla_feature_dir: str | Path,
-        pi05_feature_dir: str | Path,
-        output_path: str | Path,
-    ) -> Path:
-        ...
-
-Small private helpers are allowed.
-
-Do not expose unnecessary implementation internals.
-
-Do not add additional public APIs unless implementation reveals a genuine need.
+Feature extraction remains separate.
 
 ---
 
-## Input Directory Semantics
+## No π0.5 Runtime Dependency
 
-The two inputs are directories containing already-produced feature archives:
+Pilot-200 collection must not require:
 
-    openvla_feature_dir
-    pi05_feature_dir
+    OpenPI
+    JAX
+    π0.5 checkpoint
 
-C4 must not recursively search arbitrary nested trees.
-
-Discover:
-
-    *.npz
-
-directly under each supplied directory.
-
-Reject:
-
-- missing directories;
-- non-directory paths;
-- empty feature directories;
-- malformed NPZ files;
-- duplicate sample IDs within one feature directory.
-
-Ignore unrelated non-NPZ files.
-
-Do not infer sample identity from filename.
-
-Resolve each source archive path before recording it.
+π0.5 only consumes the frozen observations later.
 
 ---
 
-## OpenVLA Archive Contract
-
-Each OpenVLA archive must contain exactly:
-
-    o1_siglip
-    o1_fused
-    o2_projected
-    metadata_json
-
-Expected arrays:
-
-    o1_siglip
-        shape = (256, 1152)
-        dtype = float32
-    
-    o1_fused
-        shape = (256, 2176)
-        dtype = float32
-    
-    o2_projected
-        shape = (256, 4096)
-        dtype = float32
-
-All feature arrays must be:
-
-    finite
-    non-empty by virtue of the required exact shapes
-
-Do not reject all-zero arrays solely because they are all zero.
-
-Do not pool, reshape, transpose, normalize, or otherwise alter feature arrays.
-
----
-
-## OpenVLA Metadata Contract
-
-OpenVLA metadata_json must contain exactly:
-
-    sample_id
-    source_model
-    checkpoint
-    feature_schema_version
-    source_image_hash
-
-Require:
-
-    source_model == "openvla"
-
-Require:
-
-    feature_schema_version == "openvla_features_v1"
-
-Require:
-
-    sample_id
-
-to be a non-empty string.
-
-Require:
-
-    checkpoint
-
-to be a non-empty string.
-
-Do not require a specific OpenVLA checkpoint string.
-
-Require:
-
-    source_image_hash
-
-to match exactly:
-
-    sha256:<64 lowercase hexadecimal characters>
-
-The metadata sample_id is authoritative.
-
-Do not compare it with the filename stem.
-
----
-
-## π0.5 Archive Contract
-
-Each π0.5 archive must contain exactly:
-
-    p1_siglip
-    p2_projected
-    metadata_json
-
-Expected arrays:
-
-    p1_siglip
-        shape = (256, 1152)
-        dtype = float32
-    
-    p2_projected
-        shape = (256, 2048)
-        dtype = float32
-
-All feature arrays must be:
-
-    finite
-    non-empty by virtue of the required exact shapes
-
-Do not reject all-zero arrays solely because they are all zero.
-
-Do not pool, reshape, transpose, normalize, or otherwise alter feature arrays.
-
----
-
-## π0.5 Metadata Contract
-
-π0.5 metadata_json must contain exactly:
-
-    sample_id
-    source_model
-    checkpoint
-    feature_schema_version
-    source_image_hash
-
-Require:
-
-    source_model == "pi05"
-
-Require:
-
-    feature_schema_version == "pi05_features_v1"
-
-Require:
-
-    sample_id
-
-to be a non-empty string.
-
-Require:
-
-    checkpoint
-
-to equal exactly:
-
-    gs://openpi-assets/checkpoints/pi05_libero
-
-Require:
-
-    source_image_hash
-
-to match exactly:
-
-    sha256:<64 lowercase hexadecimal characters>
-
-The metadata sample_id is authoritative.
-
-Do not compare it with the filename stem.
-
----
-
-## metadata_json Parsing
-
-Load all NPZ files using:
-
-    allow_pickle=False
-
-metadata_json must be:
-
-    a NumPy scalar
-    Unicode JSON text
-    valid JSON object
-
-Reject:
-
-- object arrays;
-- non-scalar metadata_json;
-- non-Unicode metadata_json;
-- malformed JSON;
-- non-object JSON;
-- missing metadata keys;
-- additional unexpected metadata keys;
-- checkpoint values that violate the model-specific rules.
-
-Do not mutate metadata.
-
----
-
-## Sample Discovery
-
-For each directory:
-
-1. enumerate direct-child `*.npz` archives;
-2. resolve each archive path;
-3. validate each archive;
-4. extract metadata sample_id;
-5. construct:
-
-       sample_id -> validated archive record
-
-6. reject duplicate sample_id values.
-
-Do not assume:
-
-    archive filename stem == sample_id
-
-Do not validate filename/sample_id equality.
-
-Metadata sample_id is the only authoritative archive identity.
-
----
-
-## Exact Sample-Set Validation
-
-After validating both directories, compute:
-
-    openvla_ids = set(...)
-    pi05_ids = set(...)
-
-Require:
-
-    openvla_ids == pi05_ids
-
-If not equal, raise:
-
-    PairedFeatureValidationError
-
-and report both:
-
-    missing_in_openvla
-    missing_in_pi05
-
-where:
-
-    missing_in_openvla = sorted(pi05_ids - openvla_ids)
-    missing_in_pi05    = sorted(openvla_ids - pi05_ids)
-
-Do not proceed with the intersection.
-
-Do not silently skip unmatched samples.
-
----
-
-## Cross-Model Pair Validation
-
-For every sample_id in:
-
-    sorted(openvla_ids)
-
-retrieve:
-
-    openvla_record
-    pi05_record
-
-Require:
-
-    openvla_record.sample_id
-    ==
-    pi05_record.sample_id
-
-and:
-
-    openvla_record.source_image_hash
-    ==
-    pi05_record.source_image_hash
-
-If hashes differ, fail loudly and include:
-
-    sample_id
-    OpenVLA hash
-    π0.5 hash
-
-Do not recompute the raw-image hash in C4.
-
-C4 validates the provenance carried forward by C2 and C3.
-
-Raw PilotObservation archives are not required inputs to C4.
-
----
-
-## Representation Pairing Semantics
-
-C4 validates the existence of the following scientific representation pairings:
-
-    O1-S ↔ P1
-
-where:
-
-    OpenVLA o1_siglip    shape (256,1152)
-    π0.5   p1_siglip     shape (256,1152)
-
-and:
-
-    O2 ↔ P2
-
-where:
-
-    OpenVLA o2_projected shape (256,4096)
-    π0.5   p2_projected  shape (256,2048)
-
-Also preserve availability of:
-
-    OpenVLA o1_fused     shape (256,2176)
-
-as a supplementary representation.
-
-C4 must not numerically compare these representations.
-
-Different feature dimensions are expected.
-
----
-
-## Manifest Output
-
-Write exactly one manifest file to:
-
-    output_path
-
-Recommended filename:
-
-    paired_features_manifest.json
-
-The manifest must be UTF-8 JSON.
-
-Use deterministic serialization:
-
-    ensure_ascii=False
-    sort_keys=True
-    indent=2
-
-Do not use pickle.
-
-Do not write binary tensor data into the manifest.
-
----
-
-## Manifest Schema
+# Error Handling
 
 Use:
 
-    schema_version = "paired_features_v1"
+    Pilot200CollectionError
 
-Top-level structure:
+for high-level Pilot-200 orchestration and dataset integrity failures.
 
-    {
-        "schema_version": "paired_features_v1",
-        "num_samples": N,
-        "pairs": [...]
-    }
+Preserve lower-level collection error context through exception chaining.
 
-The top-level object must contain exactly:
+Distinguish:
 
-    schema_version
-    num_samples
-    pairs
+    rejected candidate state
 
-Each pair entry must contain exactly:
+from:
 
-    sample_id
-    source_image_hash
-    openvla_feature_path
-    pi05_feature_path
+    fatal infrastructure error.
 
-Example:
+Do not silently skip malformed observations or write failures.
 
-    {
-        "sample_id":
-            "libero_spatial__task02__state00__step0000",
-    
-        "source_image_hash":
-            "sha256:...",
-    
-        "openvla_feature_path":
-            "../features/openvla/example.npz",
-    
-        "pi05_feature_path":
-            "../features/pi05/example.npz"
-    }
-
-Do not duplicate:
-
-- feature tensors;
-- feature shapes;
-- feature dtypes;
-- checkpoint strings;
-- source_model;
-- feature schema versions;
-
-inside every pair.
-
-Those remain available in the validated source archives.
+Do not silently continue after a failure that makes dataset provenance
+ambiguous.
 
 ---
 
-## Manifest Path Construction
+# Unit-Test Requirements
 
-Before generating path strings:
+Tests should use fakes/mocks for LIBERO/OpenVLA runtime boundaries.
 
-    resolved_manifest_parent = output_path.resolve(strict=False).parent
+Do not require GPU, real OpenVLA, or real LIBERO for unit tests.
 
-For every validated source archive:
+Collectively verify:
 
-    resolved_archive = archive_path.resolve(strict=True)
-
-Construct the manifest path using a deterministic relative-path operation from:
-
-    resolved_manifest_parent
-
-to:
-
-    resolved_archive
-
-Serialize the result using POSIX separators.
-
-The manifest must therefore remain independent of the original absolute environment prefix when the directory tree is moved as a unit.
-
-Do not store absolute archive paths.
-
-Do not provide an absolute fallback.
-
----
-
-## Output Safety
-
-Before any filesystem mutation:
-
-1. validate both input directories;
-2. validate all OpenVLA archives;
-3. validate all π0.5 archives;
-4. validate exact sample-set equality;
-5. validate all cross-model source-image hashes;
-6. construct the complete manifest object in memory.
-
-Only after all validation succeeds:
-
-    output_path.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-Reject if:
-
-    output_path.exists()
-
-Do not overwrite.
-
-Write the final manifest using exclusive-create semantics.
-
-If writing creates an incomplete final file and then fails:
-
-    remove only that incomplete final file
-
-if it can be identified safely as having been created by the current invocation.
-
-Do not delete pre-existing files.
+1. deterministic multi-task traversal;
+2. deterministic initial-state traversal;
+3. 5 accepted groups/task target;
+4. successful rollout acceptance;
+5. policy failure rejection;
+6. failed states replaced only from same task;
+7. stop after quota satisfied;
+8. exact four samples per accepted group;
+9. target progress = 0.10/0.40/0.70/0.90;
+10. deterministic nearest-step mapping;
+11. four unique indices required;
+12. short trajectory rejection;
+13. real step IDs retained in sample IDs;
+14. target vs actual progress remain distinct;
+15. PilotObservation schema unchanged;
+16. no partial group survives write failure;
+17. no source artifact overwrite;
+18. duplicate sample IDs rejected;
+19. deterministic manifest ordering;
+20. exact dataset census;
+21. COMPLETE status;
+22. USABLE_WITH_SHORTFALL status;
+23. BLOCKED status;
+24. per-task minimum coverage enforcement;
+25. rejected-state reason preservation;
+26. non-NPZ unrelated files do not become observations;
+27. no feature extraction occurs;
+28. existing collect_pilot_observations API remains compatible.
 
 ---
 
-## Deterministic Ordering
+# Required Existing-Test Regression Check
 
-The manifest pairs must appear in exactly:
+If shared_feature/libero_collector.py is modified, run at minimum:
 
-    sorted(sample_id)
-
-order.
-
-Require:
-
-    num_samples == len(pairs)
-
-Every sample_id must appear exactly once.
-
-This manifest ordering becomes the canonical downstream Pilot ordering.
-
-C5 and later stages must consume this order rather than rediscovering archives independently.
-
----
-
-## Validation Summary
-
-The function does not need to print extensively.
-
-However, successful completion must imply:
-
-    OpenVLA samples: N
-    π0.5 samples: N
-    matched sample IDs: N
-    matched source hashes: N
-    hash mismatches: 0
-    missing in OpenVLA: 0
-    missing in π0.5: 0
-
-Do not add a second report artifact in C4.
-
-The paired manifest is the required output artifact.
-
----
-
-## Error Handling
-
-Raise:
-
-    PairedFeatureValidationError
-
-for C4 validation and external-boundary failures.
-
-Appropriate failures include:
-
-- missing input directory;
-- input path is not a directory;
-- empty feature directory;
-- malformed NPZ;
-- unexpected NPZ keys;
-- malformed metadata_json;
-- metadata schema mismatch;
-- wrong source_model;
-- wrong feature_schema_version;
-- malformed sample_id;
-- malformed checkpoint provenance;
-- wrong π0.5 checkpoint;
-- malformed source_image_hash;
-- duplicate sample_id;
-- wrong feature shape;
-- wrong feature dtype;
-- non-finite features;
-- unequal cross-model sample sets;
-- cross-model source-image hash mismatch;
-- relative-path construction failure;
-- output collision;
-- manifest serialization failure.
-
-If a PairedFeatureValidationError already exists internally, propagate it unchanged.
-
-Wrap external I/O, NumPy, JSON, and filesystem failures with exception chaining where appropriate.
-
-Do not silently skip bad archives.
-
----
-
-## Unit-Test Strategy
-
-Use focused tests rather than one test function per checklist item.
-
-Mocks are not necessary for most C4 behavior.
-
-Tests should construct small temporary NPZ archives using real NumPy serialization.
-
-Do not depend on:
-
-- OpenPI;
-- OpenVLA;
-- JAX;
-- PyTorch;
-- CUDA;
-- LIBERO.
-
----
-
-## Unit-Level Behaviors to Verify
-
-Tests should collectively cover:
-
-1. successful pairing of multiple valid OpenVLA and π0.5 archives;
-2. deterministic sorted metadata sample_id ordering;
-3. filename stem is NOT required to equal sample_id;
-4. exact sample-set equality;
-5. matching source_image_hash requirement;
-6. OpenVLA exact archive keys;
-7. π0.5 exact archive keys;
-8. OpenVLA expected feature shapes;
-9. π0.5 expected feature shapes;
-10. float32 dtype requirement;
-11. finite feature requirement;
-12. all-zero finite arrays are not rejected solely for being zero;
-13. OpenVLA metadata schema;
-14. π0.5 metadata schema;
-15. source_model validation;
-16. feature_schema_version validation;
-17. OpenVLA non-empty checkpoint requirement;
-18. π0.5 exact checkpoint requirement;
-19. malformed metadata JSON rejection;
-20. non-scalar metadata_json rejection;
-21. non-Unicode metadata_json rejection;
-22. malformed source-image hash rejection;
-23. duplicate sample_id rejection within OpenVLA;
-24. duplicate sample_id rejection within π0.5;
-25. missing sample on either side;
-26. explicit reporting of missing_in_openvla;
-27. explicit reporting of missing_in_pi05;
-28. hash mismatch rejection;
-29. non-NPZ files are ignored;
-30. empty feature directory rejection;
-31. missing directory rejection;
-32. output collision rejection;
-33. exact manifest top-level schema;
-34. exact per-pair manifest fields;
-35. manifest archive paths are relative;
-36. manifest archive paths use POSIX separators;
-37. manifest paths resolve back to the exact validated source archives;
-38. num_samples consistency;
-39. output file is valid UTF-8 JSON;
-40. output parent is created only after successful input validation;
-41. source feature archives remain unchanged.
-
----
-
-## Required Happy-Path Test
-
-Construct at least three samples with deliberately unrelated archive filenames, for example:
-
-    z_file.npz -> metadata sample-b
-    a_file.npz -> metadata sample-c
-    m_file.npz -> metadata sample-a
-
-on each model side.
-
-The test must succeed.
-
-Verify manifest order:
-
-    sample-a
-    sample-b
-    sample-c
-
-based only on metadata sample_id.
-
-Verify every pair carries the expected shared source_image_hash.
-
-Verify stored source paths are relative POSIX paths from the manifest parent.
-
-Verify those paths resolve back to the exact source archives.
-
----
-
-## Required Sample-Set Failure Test
-
-Construct:
-
-    OpenVLA:
-        sample-a
-        sample-b
-        sample-c
-    
-    π0.5:
-        sample-a
-        sample-c
-        sample-d
-
-Require failure reporting:
-
-    missing_in_openvla = ["sample-d"]
-    missing_in_pi05    = ["sample-b"]
-
-Do not allow a two-sample intersection manifest to be created.
-
----
-
-## Required Hash-Mismatch Test
-
-Construct valid archives with:
-
-    sample_id == "sample-a"
-
-on both sides but:
-
-    OpenVLA source_image_hash = hash_A
-    π0.5   source_image_hash = hash_B
-
-Require:
-
-    PairedFeatureValidationError
-
-and include:
-
-    sample-a
-    hash_A
-    hash_B
-
-in the error context.
-
----
-
-## Required Checkpoint Tests
-
-Verify:
-
-OpenVLA:
-
-    checkpoint = "/some/local/openvla/checkpoint"
-
-is accepted if non-empty.
-
-Reject:
-
-    checkpoint = ""
-    checkpoint = null
-    checkpoint = numeric value
-
-For π0.5 accept only:
-
-    gs://openpi-assets/checkpoints/pi05_libero
-
-Reject:
-
-    ""
-    null
-    numeric values
-    gs://openpi-assets/checkpoints/pi05_base
-    arbitrary local checkpoint strings
-
----
-
-## Integration Boundary
-
-C4 does not require a GPU/model smoke.
-
-A successful implementation plus unit tests establishes:
-
-    C4 paired-feature manifest builder — UNIT-LEVEL PASS
-
-Before using the manifest for scientific C5 analysis, perform one lightweight real-artifact validation using existing C2 and C3 feature directories.
-
-That validation must:
-
-1. run the production C4 manifest builder;
-2. use real C2 OpenVLA feature artifacts;
-3. use real C3 π0.5 feature artifacts;
-4. confirm full sample-set equality;
-5. confirm all source hashes match;
-6. inspect the resulting manifest;
-7. resolve every manifest path back to its source archive.
-
-This real-artifact validation does not require model inference.
-
-Do not rerun OpenVLA or π0.5 models for C4.
-
----
-
-## Required Verification Before Completion
-
-Run at minimum:
-
-    tests/test_paired_features.py
+    tests/test_libero_collector.py
+    tests/test_pilot_observation.py
 
 Also run:
 
-    tests/test_openvla_features.py
-    tests/test_pi05_features.py
+    tests/test_pilot200_collector.py
 
-if public package exports are changed.
-
-Run the complete project test suite if practical.
-
-Run Ruff on:
-
-    shared_feature/paired_features.py
-    shared_feature/__init__.py
-    tests/test_paired_features.py
-
-Report:
-
-- files changed;
-- implementation summary;
-- public API;
-- test commands;
-- test results;
-- Ruff result;
-- manifest schema;
-- exact path-storage semantics;
-- checkpoint-validation semantics;
-- any contract mismatch discovered;
-- whether any forbidden file changed.
+and preferably the full suite.
 
 ---
 
-## Documentation
+# Ruff / Static Checks
 
-Do not modify:
+Run Ruff on all changed Python files.
+
+Run:
+
+    git diff --check
+
+Report both results.
+
+---
+
+# Real Integration Boundary
+
+Unit implementation may establish only:
+
+    Pilot-200 collector — UNIT-LEVEL PASS
+
+Do not immediately collect all 200 observations during the coding task.
+
+After unit-level acceptance, perform a separate narrow real integration
+smoke first.
+
+Recommended real smoke:
+
+    multiple LIBERO-Spatial tasks
+    at least one successful accepted group per selected task
+    four formal observations/group
+
+The smoke must verify:
+
+    task switching
+    real official state availability
+    successful rollout
+    10/40/70/90 sampling
+    sample identity
+    collection manifest
+    raw PilotObservation validity
+
+Only after that smoke is accepted should the full Pilot-200 collection run
+begin.
+
+---
+
+# Required Runtime Audit Output
+
+Before claiming implementation complete, report from the actual checked
+LIBERO API or clearly identify that runtime verification remains for the
+real smoke:
+
+    discovered LIBERO-Spatial task count
+    official initial-state availability semantics
+
+Do not fabricate these values in unit tests and report them as real facts.
+
+---
+
+# Documentation Boundary
+
+Do not update:
 
     docs/pilot-v0.1-spec.md
     docs/research-map.md
 
-during this coding task.
+inside this coding task.
 
-Their stale status / historical π0 wording is a known non-blocking documentation issue.
+Documentation synchronization is a separate later milestone.
 
-Documentation synchronization will be handled in a separate task.
-
-If implementation reveals a genuine contradiction with C2/C3 artifact schemas, STOP and report it before changing documentation or source extractors.
+Do not modify task.md during implementation unless explicitly asked.
 
 ---
 
-## Maximum Status After Coding
+# Maximum Status After Coding
 
-Successful implementation and tests may establish:
+Maximum successful coding status:
 
-    C4 paired-feature manifest builder — UNIT-LEVEL PASS
+    C5-D0 Pilot-200 collector — UNIT-LEVEL PASS
 
-Do not yet claim:
+Do not claim:
 
-    C4 Paired Feature Dataset — PASS
+    Pilot-200 Dataset — COMPLETE
 
-until the real-artifact validation is completed.
+until the full real collection has been executed and audited.
 
 Do not claim:
 
@@ -1199,56 +1058,62 @@ Do not claim:
     transferable representation discovered
     policy-relevant representation discovered
 
-Those are later scientific conclusions.
+---
+
+# Follow-Up Sequence
+
+After unit-level PASS:
+
+    real multi-task collection smoke
+
+then:
+
+    full Pilot-200 observation collection
+
+then:
+
+    C2 full OpenVLA feature extraction
+
+then:
+
+    C3 full π0.5 feature extraction
+        batch_size = 1
+
+then:
+
+    C4 full paired-feature manifest
+
+then:
+
+    freeze C5 group-aware train/held-out split
+
+then:
+
+    implement/run C5 SVCCA analysis
 
 ---
 
-## Real-Artifact Follow-Up
+# Stop Conditions
 
-After the unit-level implementation is accepted, run a separate lightweight real-artifact C4 validation.
+STOP and report rather than expanding scope if:
 
-Expected successful result:
+1. real LIBERO-Spatial task availability contradicts the frozen design;
+2. official initial-state availability cannot support the required coverage;
+3. safe reuse of low-level C1 rollout logic requires breaking the existing
+   collect_pilot_observations API;
+4. existing C1 tests cannot remain behaviorally valid;
+5. successful trajectories cannot provide the frozen four-point sampling
+   protocol;
+6. implementation would require changing PilotObservation semantics;
+7. implementation would require modifying C2/C3/C4;
+8. implementation begins introducing C5 statistical analysis.
 
-    OpenVLA sample count == π0.5 sample count
-    sample sets identical
-    all source_image_hash values identical pairwise
-    manifest written successfully
-    all relative manifest paths resolve correctly
+The first coding task ends when:
 
-After that validation:
-
-    C4 Paired Feature Dataset — PASS
-
-Then C5 may begin.
-
----
-
-## Stop Condition
-
-Stop when:
-
-1. both feature directories are strictly validated;
-2. exact cross-model sample-set equality is enforced;
-3. every pair is validated by metadata sample_id and source_image_hash;
-4. all expected feature schemas are validated;
-5. checkpoint provenance rules are enforced;
-6. deterministic sample ordering is frozen;
-7. deterministic relative manifest paths are written;
-8. the lightweight manifest is written;
-9. focused unit tests pass;
-10. relevant existing tests remain green;
-11. Ruff passes;
-12. no representation analysis has been added.
-
-If satisfying C4 would require:
-
-- changing C2 or C3 feature semantics;
-- modifying source extractors;
-- recomputing representations;
-- silently dropping unmatched samples;
-- ignoring provenance mismatches;
-- accepting arbitrary π0.5 checkpoint provenance;
-- introducing PCA / CCA / CKA / regression;
-- copying all feature tensors into a new dataset;
-
-STOP and report the blocker rather than expanding scope.
+    Pilot-200 high-level orchestration exists
+    existing C1 semantics remain intact
+    collection manifest is implemented
+    quota/completeness logic is implemented
+    focused tests pass
+    regressions pass
+    Ruff passes
