@@ -32,6 +32,14 @@ class PilotCollectionError(RuntimeError):
     """Raised when an episode cannot produce a valid Pilot sample set."""
 
 
+class _EpisodeCollectionError(PilotCollectionError):
+    """Private structured episode failure used by higher-level collectors."""
+
+    def __init__(self, category: str, message: str) -> None:
+        super().__init__(message)
+        self.category = category
+
+
 @dataclass(frozen=True)
 class _BufferedObservation:
     step_id: int
@@ -173,6 +181,7 @@ def _collect_episode(
     task: Any,
     initial_state: Any,
     initial_state_id: int,
+    task_id: int = PILOT_TASK_ID,
 ) -> tuple[list[_BufferedObservation], bool]:
     env: Any = None
     try:
@@ -189,37 +198,64 @@ def _collect_episode(
             observation, _, done, _ = env.step(list(_DUMMY_ACTION))
             success = _check_success(env)
             if done or success:
-                raise PilotCollectionError(
+                raise _EpisodeCollectionError(
+                    "DUMMY_PHASE_ERROR",
                     "episode ended during dummy phase: "
-                    f"state={initial_state_id}, dummy_step={dummy_step}"
+                    f"task={task_id}, state={initial_state_id}, "
+                    f"dummy_step={dummy_step}",
                 )
 
         trajectory: list[_BufferedObservation] = []
         episode_success = False
         for step_id in range(_MAX_POLICY_ACTIONS):
-            buffered = _capture_observation(observation, step_id)
+            try:
+                buffered = _capture_observation(observation, step_id)
+            except PilotCollectionError as error:
+                raise _EpisodeCollectionError(
+                    "OBSERVATION_ERROR",
+                    str(error),
+                ) from error
             trajectory.append(buffered)
 
-            policy_observation = _build_policy_observation(
-                runtime,
-                action_config,
-                observation,
-                buffered.state,
-            )
-            action = runtime.get_action(
-                action_config,
-                model,
-                policy_observation,
-                task_description,
-                processor=processor,
-            )
-            if not isinstance(action, np.ndarray) or action.shape != (7,):
-                raise PilotCollectionError(
-                    f"OpenVLA action must be a NumPy array with shape (7,), got "
-                    f"{type(action).__name__} {getattr(action, 'shape', None)}"
+            try:
+                policy_observation = _build_policy_observation(
+                    runtime,
+                    action_config,
+                    observation,
+                    buffered.state,
                 )
-            action = runtime.normalize_gripper_action(action, binarize=True)
-            action = runtime.invert_gripper_action(action)
+            except Exception as error:
+                raise _EpisodeCollectionError(
+                    "OBSERVATION_ERROR",
+                    "failed to build the OpenVLA policy observation",
+                ) from error
+            try:
+                action = runtime.get_action(
+                    action_config,
+                    model,
+                    policy_observation,
+                    task_description,
+                    processor=processor,
+                )
+            except Exception as error:
+                raise _EpisodeCollectionError(
+                    "ACTION_ERROR",
+                    "OpenVLA action generation failed",
+                ) from error
+            if not isinstance(action, np.ndarray) or action.shape != (7,):
+                raise _EpisodeCollectionError(
+                    "ACTION_ERROR",
+                    f"OpenVLA action must be a NumPy array with shape (7,), got "
+                    f"{type(action).__name__} {getattr(action, 'shape', None)}",
+                )
+            try:
+                action = runtime.normalize_gripper_action(action, binarize=True)
+                action = runtime.invert_gripper_action(action)
+            except Exception as error:
+                raise _EpisodeCollectionError(
+                    "ACTION_ERROR",
+                    "OpenVLA action post-processing failed",
+                ) from error
 
             observation, _, done, _ = env.step(action.tolist())
             episode_success = _check_success(env)
@@ -227,13 +263,14 @@ def _collect_episode(
                 break
 
         return trajectory, episode_success
-    except PilotCollectionError:
+    except _EpisodeCollectionError:
         raise
     except Exception as error:
-        raise PilotCollectionError(
+        raise _EpisodeCollectionError(
+            "RUNTIME_ERROR",
             "LIBERO collection failed: "
-            f"suite={PILOT_SUITE}, task={PILOT_TASK_ID}, "
-            f"state={initial_state_id}"
+            f"suite={PILOT_SUITE}, task={task_id}, "
+            f"state={initial_state_id}",
         ) from error
     finally:
         if env is not None:
