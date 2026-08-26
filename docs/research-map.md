@@ -228,6 +228,8 @@ C3 — π0.5 feature extraction               PASS
 C4 — paired-feature manifest               PASS
 C5-D0 — Pilot v0.2 collector               UNIT-LEVEL PASS
 C5-D0 — reduced real integration smoke     PASS
+C5-D0 — Pilot v0.2 formal collection       COMPLETE
+C2/C3 — full extraction contract           PASS
 ```
 
 C1 已完成 real OpenVLA/LIBERO smoke。
@@ -238,6 +240,12 @@ C5-D0 reduced real integration smoke 已使用 LIBERO-Spatial tasks `0` 和 `1`
 `SMOKE_COMPLETED + null`。该结果证明 multi-task collection integration closure，
 不构成 formal Pilot v0.2 dataset collection。Portable checkpoint identity 的冻结
 来自后续独立、明确的 scientific decision，而不是由 smoke 结果自动推导。
+
+C5-D0 formal collection 已按冻结协议完成全部 10 个 LIBERO-Spatial tasks、
+50 个 accepted trajectory groups 和 200 个 canonical `PilotObservation`。
+其 manifest 状态为 `COMPLETED + COMPLETE`。当前后续工程边界是基于这 200 个
+冻结 observations 执行 C2/C3 full feature extraction；相应 coding contract 已完成
+read-only audit，但实际实现与真实模型执行仍需各自明确授权。
 
 C2 保存：
 
@@ -1005,18 +1013,22 @@ task.md
 1. pilot-v0.2-spec.md        PASS
 2. research-map.md           PASS
 3. AGENTS.md routing update  PASS
-4. task.md                   DRAFT — AUDIT REQUIRED
+4. task.md                   PASS — READY FOR IMPLEMENTATION AUTHORIZATION
 ```
 
 Pilot v0.1 remains historical and unchanged.
 
 `AGENTS.md` now distinguishes v0.1 and v0.2 routing and preserves stage-specific OPEN blockers.
 
-The C5-D0 collector has reached `UNIT-LEVEL PASS`, and its reduced real integration
-smoke has been audited as `PASS`. The current `task.md` is the draft contract for
-the formal full-collection entrypoint and requires read-only audit before coding.
+The C5-D0 collector has reached `UNIT-LEVEL PASS`, its reduced real integration
+smoke has been audited as `PASS`, and the formal Pilot v0.2 collection has reached
+`COMPLETED + COMPLETE` with 50 accepted groups and 200 canonical observations. The
+current `task.md` is the audited C2/C3 full feature-extraction contract and is ready
+for a separate implementation authorization.
 
-The portable OpenVLA checkpoint identity is frozen as `openvla/openvla-7b-finetuned-libero-spatial`; full collection now requires its own explicit execution authorization.
+The portable OpenVLA checkpoint identity is frozen as
+`openvla/openvla-7b-finetuned-libero-spatial` and was used by the completed formal
+collection.
 
 Formal C5 PASS/FAIL evaluation remains separately blocked until the exact C5 go/no-go rule and null RNG seed are frozen in a dedicated C5 scientific contract.
 
