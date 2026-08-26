@@ -187,28 +187,20 @@ Frozen statistical, sampling, grouping, split, CKA, SVCCA, and null-design decis
 
 ---
 
-## Current OPEN Blockers
+## Current Research Decisions and OPEN Blockers
 
-### Portable OpenVLA Checkpoint Identity
+### DECISION — Portable OpenVLA Checkpoint Identity
 
-The portable OpenVLA checkpoint identity for formal Pilot v0.2 collection is currently `OPEN`.
-
-A machine-local filesystem path is not sufficient as the scientific checkpoint identity.
-
-While this item remains `OPEN`:
+The portable OpenVLA checkpoint identity for formal Pilot v0.2 collection is frozen as:
 
 ```text
-formal Pilot v0.2 collection execution MUST NOT start
+openvla/openvla-7b-finetuned-libero-spatial
 ```
 
-This blocker does not by itself prohibit:
-
-- documentation updates;
-- AGENTS routing updates;
-- preparation or review of implementation contracts;
-- other work that does not require selecting or executing the unresolved formal checkpoint identity.
-
-Do not invent or infer a portable checkpoint identity from a local directory name.
+This identity intentionally has no immutable-revision suffix. A machine-local
+checkpoint path is runtime provenance only and must not replace this identity.
+The identity decision removes the checkpoint-specific scientific blocker, but
+formal collection execution still requires an explicit coding/execution contract.
 
 ---
 
@@ -224,7 +216,7 @@ formal C5 PASS/FAIL evaluation MUST NOT begin
 
 This blocker does not prevent:
 
-- Pilot v0.2 collection, once its own checkpoint blocker is resolved;
+- Pilot v0.2 collection under its own explicit execution contract;
 - C2/C3/C4 feature extraction and pairing;
 - implementation or validation work that does not inspect formal C5 results to choose thresholds.
 

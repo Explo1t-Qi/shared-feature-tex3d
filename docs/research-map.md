@@ -218,7 +218,7 @@ O1-F 只做 supplementary analysis。
 
 ## 5. Current Pipeline Status
 
-当前 C0–C4 状态：
+当前 pipeline 状态：
 
 ```text
 C0 — PilotObservation schema               PASS
@@ -226,9 +226,18 @@ C1 — LIBERO/OpenVLA observation collector  PASS
 C2 — OpenVLA feature extraction            PASS
 C3 — π0.5 feature extraction               PASS
 C4 — paired-feature manifest               PASS
+C5-D0 — Pilot v0.2 collector               UNIT-LEVEL PASS
+C5-D0 — reduced real integration smoke     PASS
 ```
 
 C1 已完成 real OpenVLA/LIBERO smoke。
+
+C5-D0 reduced real integration smoke 已使用 LIBERO-Spatial tasks `0` 和 `1`
+完成真实 OpenVLA/LIBERO 验证：每个 task 接受 official initial state `0` 的
+一个成功 group，共生成 `8` 个有效 `PilotObservation`，manifest 状态为
+`SMOKE_COMPLETED + null`。该结果证明 multi-task collection integration closure，
+不构成 formal Pilot v0.2 dataset collection。Portable checkpoint identity 的冻结
+来自后续独立、明确的 scientific decision，而不是由 smoke 结果自动推导。
 
 C2 保存：
 
@@ -369,9 +378,9 @@ BLOCKED
 
 ---
 
-## 8. Current Research Blocker
+## 8. Frozen OpenVLA Collection Identity
 
-### OPEN — Portable OpenVLA Checkpoint Identity
+### DECISION — Portable OpenVLA Checkpoint Identity
 
 Pilot v0.2 已冻结 OpenVLA rollout 的主要 scientific configuration，包括：
 
@@ -387,39 +396,19 @@ Pilot v0.2 已冻结 OpenVLA rollout 的主要 scientific configuration，包括
 - deterministic action decoding with `do_sample = False`；
 - 已验证的 C1 action/preprocessing path。
 
-但 portable OpenVLA checkpoint identity 仍未冻结。
-
-机器本地 filesystem path 不能作为 scientific checkpoint identity。
-
-在正式 Pilot v0.2 collection 开始之前，必须将该项从：
+portable OpenVLA checkpoint identity 已冻结为：
 
 ```text
-OPEN
+openvla/openvla-7b-finetuned-libero-spatial
 ```
 
-转换为：
+该 identity 按明确 scientific decision 不附加 immutable revision suffix。
+机器本地 resolved checkpoint path 只作为 runtime provenance 写入 collection
+manifest，不属于 portable scientific identity。
 
-```text
-DECISION
-```
-
-并使用可移植、稳定的 checkpoint identity，例如 repository/revision、artifact identity 或 checkpoint content digest。
-
-### STOP CONDITION
-
-在 portable OpenVLA checkpoint identity 冻结之前：
-
-```text
-formal Pilot v0.2 collection MUST NOT start
-```
-
-该 OPEN 不阻塞：
-
-- `research-map.md` 更新；
-- `AGENTS.md` 文档路由更新；
-- collection contract 的准备性讨论。
-
-但它阻塞正式 collection execution。
+portable checkpoint identity blocker 已解除。Formal Pilot v0.2 collection 仍须通过
+独立、明确授权的 full-collection contract/entrypoint 执行，不得把 reduced smoke
+当作正式 collection。
 
 ---
 
@@ -950,7 +939,7 @@ Held-out VLA 不提供：
 ```text
 Pilot v0.2 protocol freeze
         ↓
-resolve portable OpenVLA checkpoint identity
+portable OpenVLA checkpoint identity frozen
         ↓
 Pilot v0.2 collection
         ↓
@@ -1016,16 +1005,18 @@ task.md
 1. pilot-v0.2-spec.md        PASS
 2. research-map.md           PASS
 3. AGENTS.md routing update  PASS
-4. task.md                   PASS
+4. task.md                   DRAFT — AUDIT REQUIRED
 ```
 
 Pilot v0.1 remains historical and unchanged.
 
 `AGENTS.md` now distinguishes v0.1 and v0.2 routing and preserves stage-specific OPEN blockers.
 
-The current `task.md` is the implementation contract under final audit. Coding must not begin until that contract passes review.
+The C5-D0 collector has reached `UNIT-LEVEL PASS`, and its reduced real integration
+smoke has been audited as `PASS`. The current `task.md` is the draft contract for
+the formal full-collection entrypoint and requires read-only audit before coding.
 
-Formal Pilot v0.2 collection remains blocked until the portable OpenVLA checkpoint identity is frozen.
+The portable OpenVLA checkpoint identity is frozen as `openvla/openvla-7b-finetuned-libero-spatial`; full collection now requires its own explicit execution authorization.
 
 Formal C5 PASS/FAIL evaluation remains separately blocked until the exact C5 go/no-go rule and null RNG seed are frozen in a dedicated C5 scientific contract.
 

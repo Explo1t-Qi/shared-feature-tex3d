@@ -56,15 +56,18 @@ The following rollout settings are part of the scientific protocol:
 
 Both seed values and the deterministic action-decoding setting must be recorded in collection provenance.
 
-### OPEN — Portable OpenVLA Checkpoint Identity
+### DECISION — Portable OpenVLA Checkpoint Identity
 
-The portable logical identity of the OpenVLA checkpoint must be frozen before formal Pilot v0.2 collection begins.
+The frozen portable logical identity of the OpenVLA checkpoint is:
 
-The checkpoint identity must not be defined only by a machine-local filesystem path. A portable identity should use an appropriate stable identifier such as a repository/revision, artifact identifier, or checkpoint content digest.
+```text
+openvla/openvla-7b-finetuned-libero-spatial
+```
+
+This identity intentionally contains no additional immutable-revision suffix.
+It is the authoritative model identity for Pilot v0.2 collection.
 
 The resolved local checkpoint path and other runtime provenance belong in the collection manifest rather than the scientific identity itself.
-
-Formal Pilot v0.2 collection must not begin while this checkpoint identity remains `OPEN`.
 
 ## 4. Dataset Scope
 
