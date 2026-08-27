@@ -204,25 +204,39 @@ formal collection execution still requires an explicit coding/execution contract
 
 ---
 
-### Exact C5 Go/No-Go Decision Rule
+### DECISION — C5-A Representation Geometry
 
-The exact C5 PASS/FAIL decision rule and null-permutation RNG seed are currently `OPEN`.
+The current `task.md` is the frozen scientific authority for C5-A only.
 
-While these items remain `OPEN`:
+The following C5-A decisions are frozen:
 
-```text
-formal C5 PASS/FAIL evaluation MUST NOT begin
-```
+- primary estimator: debiased Linear CKA on `O2 ↔ P2`;
+- robustness metric: Spearman RSA;
+- diagnostic metric: biased Linear CKA;
+- representation input: observation-level mean pooling;
+- null: 50 group-block derangements;
+- C5-A null RNG seed and exact convention: seed `7` under the contract-defined
+  independent TRAIN / HELD-OUT streams;
+- C5-A geometry-stage gate: `TRAIN PASS AND HELD-OUT PASS`.
 
-This blocker does not prevent:
+These decisions authorize only the C5-A geometry-stage contract. They do not
+constitute a final C5 PASS/FAIL rule and must not be generalized to C5-B.
 
-- Pilot v0.2 collection under its own explicit execution contract;
-- C2/C3/C4 feature extraction and pairing;
-- implementation or validation work that does not inspect formal C5 results to choose thresholds.
+### OPEN — C5-B and Final Joint C5 Gate
 
-Do not choose significance thresholds, effect-size cutoffs, null seeds, or CKA/SVCCA joint decision logic during implementation.
+The following remain `OPEN` or `NOT STARTED`:
 
-These decisions must be frozen in an independent C5 scientific contract before formal C5 results are evaluated.
+- C5-B / SVCCA contract: `NOT STARTED`;
+- C5-B RNG: `OPEN`;
+- C5-B null protocol: `OPEN`;
+- C5-B thresholds and PASS/FAIL rule: `OPEN`;
+- final CKA + SVCCA joint C5 gate: `OPEN`;
+- final overall C5 PASS/FAIL rule: `OPEN`.
+
+Do not choose or infer any of these C5-B or final-joint decisions while
+implementing or evaluating C5-A. Formal C5-B evaluation and final overall C5
+PASS/FAIL evaluation must not begin until their own scientific contracts are
+frozen and explicitly authorized.
 
 ---
 
