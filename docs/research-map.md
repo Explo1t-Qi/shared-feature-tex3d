@@ -231,7 +231,7 @@ C5-D0 — reduced real integration smoke     PASS
 C5-D0 — Pilot v0.2 formal collection       COMPLETE
 C2/C3 — Pilot v0.2 full extraction         COMPLETE
 C4 — Pilot v0.2 formal paired manifest     COMPLETE
-C5-A — Representation Geometry             METHOD FROZEN / READY FOR IMPLEMENTATION
+C5-A — Representation Geometry             FORMAL COMPLETE / GO
 C5-B — Explicit Shared-Space Alignment     NOT STARTED
 Final joint C5 gate                         OPEN
 ```
@@ -273,7 +273,9 @@ pipeline closure
 ```
 
 不能用于正式 C5 scientific conclusion。当前 `task.md` 已冻结 C5-A 方法与
-geometry-stage gate；C5-A 尚未实现或正式执行。C5-B 与最终 joint C5 gate 仍未冻结。
+geometry-stage gate；C5-A 已在正式 C4 paired dataset 上执行完成，TRAIN 与
+HELD-OUT 均通过冻结判据，geometry-stage 结果为 `GO`。该结果只允许进入 C5-B
+discussion，不是最终 C5 PASS。C5-B 与最终 joint C5 gate 仍未冻结。
 
 ---
 
@@ -427,13 +429,38 @@ portable checkpoint identity blocker 已解除。Formal Pilot v0.2 collection �
 
 ## 9. C5-A — Representation Geometry
 
-### STATUS — METHOD FROZEN / READY FOR IMPLEMENTATION
+### STATUS — FORMAL COMPLETE / GO
 
 C5-A 回答：
 
 > OpenVLA 与 \(\pi_{0.5}\) 是否对同一批 observations 形成相似的 representation geometry？
 
 当前 `task.md` 是 C5-A scientific/statistical contract 的冻结 authority。
+
+### FACT — Formal C5-A Result
+
+正式 C5-A 已在 50 个 trajectory groups、200 个 paired observations 上完成：
+
+```text
+O2 ↔ P2 TRAIN
+debiased Linear CKA = 0.528420895275
+empirical p-value  = 0.0196078431373
+split result       = PASS
+
+O2 ↔ P2 HELD-OUT
+debiased Linear CKA = 0.478168155531
+empirical p-value  = 0.0196078431373
+split result       = PASS
+
+C5-A geometry-stage result = GO
+```
+
+正式输出的 split manifest、metric summary、null arrays 与 Markdown summary
+已通过一致性审计。50 次 TRAIN / HELD-OUT 独立 group-block derangements 与冻结
+`SeedSequence(7).spawn(2)`、PCG64 convention 完全一致。
+
+该结果支持继续准备独立 C5-B scientific contract，但不构成最终 C5 PASS，
+也不冻结 C5-B 或 final joint gate 的任何规则。
 
 ### DECISION — Frozen C5-A Method
 
@@ -825,7 +852,8 @@ and
 one-sided empirical p-value <= 0.05
 ```
 
-该 C5-A gate 只决定是否进入 C5-B explicit-alignment discussion。
+该 C5-A gate 只决定是否进入 C5-B explicit-alignment discussion。正式执行中
+TRAIN 与 HELD-OUT 均为 `PASS`，因此冻结的 geometry-stage 结果为 `C5-A GO`。
 
 ### OPEN — C5-B and Final Joint C5 Gate
 
@@ -856,8 +884,9 @@ formal C5-B PASS/FAIL evaluation MUST NOT begin
 final overall C5 PASS/FAIL evaluation MUST NOT begin
 ```
 
-该 blocker 不阻止按冻结 `task.md` 实现或执行 C5-A。以下解释只描述不同
-CKA/SVCCA 结果模式的科学含义，不代表最终 joint C5 gate 已冻结。
+这些 blocker 不改变已经完成的 `C5-A GO`，但阻止由该结果直接开始正式 C5-B
+评估或作出最终 C5 conclusion。以下解释只描述不同 CKA/SVCCA 结果模式的
+科学含义，不代表最终 joint C5 gate 已冻结。
 
 ### CKA positive + SVCCA positive
 
@@ -1018,9 +1047,9 @@ C4 full paired-feature manifest
         ↓
 group-aware C5 split
         ↓
-C5-A Linear CKA
+C5-A Linear CKA — FORMAL COMPLETE / GO
         ↓
-C5-B SVCCA
+C5-B SVCCA — NOT STARTED
         ↓
 policy/action relevance analysis
         ↓
@@ -1033,12 +1062,12 @@ Tex3D texture optimization
 held-out cross-VLA transfer evaluation
 ```
 
-当前可执行的第一个 stage gate 是 C5-A geometry-stage gate：
+第一个 stage gate——C5-A geometry-stage gate——已经正式执行：
 
 > `O2 ↔ P2` 是否在 TRAIN 与 HELD-OUT 上都通过冻结的 debiased Linear CKA
 > group-block null criterion？
 
-C5-A GO 只允许进入 C5-B discussion。C5-B / SVCCA contract、C5-B RNG、
+C5-A 的正式结果为 `GO`，且只允许进入 C5-B discussion。C5-B / SVCCA contract、C5-B RNG、
 C5-B PASS/FAIL，以及最终 CKA + SVCCA joint C5 gate 仍为 `OPEN / NOT STARTED`。
 
 如果 C5-A NO-GO，应停止并重新评估当前 frozen geometry hypothesis；不得静默
@@ -1075,8 +1104,8 @@ task.md
 ```text
 1. pilot-v0.2-spec.md        PASS
 2. task.md                   C5-A METHOD FROZEN
-3. AGENTS.md                 C5-A STATUS SYNCHRONIZED
-4. research-map.md           C5-A STATUS SYNCHRONIZED
+3. AGENTS.md                 C5-A FORMAL RESULT SYNCHRONIZED
+4. research-map.md           C5-A FORMAL RESULT SYNCHRONIZED
 ```
 
 Pilot v0.1 remains historical and unchanged.
@@ -1089,8 +1118,9 @@ The C5-D0 collector has reached `UNIT-LEVEL PASS`, its reduced real integration
 smoke has been audited as `PASS`, and the formal Pilot v0.2 collection has reached
 `COMPLETED + COMPLETE` with 50 accepted groups and 200 canonical observations.
 C2/C3 formal extraction and C4 formal pairing are complete. The current `task.md`
-is the frozen C5-A scientific/statistical contract and C5-A is ready for a separate
-implementation authorization.
+is the frozen C5-A scientific/statistical contract. Formal C5-A execution is also
+complete: TRAIN and HELD-OUT both passed, producing the frozen geometry-stage
+result `C5-A GO`.
 
 The portable OpenVLA checkpoint identity is frozen as
 `openvla/openvla-7b-finetuned-libero-spatial` and was used by the completed formal
@@ -1098,7 +1128,8 @@ collection.
 
 C5-B / SVCCA remains `NOT STARTED`; its RNG, null protocol, threshold, and PASS/FAIL
 rule remain `OPEN`. The final CKA + SVCCA joint gate and final overall C5 PASS/FAIL
-rule also remain `OPEN`.
+rule also remain `OPEN`. The completed `C5-A GO` must not be reported as either of
+those later conclusions.
 
 ---
 
