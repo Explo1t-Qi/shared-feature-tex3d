@@ -206,7 +206,7 @@ formal collection execution still requires an explicit coding/execution contract
 
 ### DECISION / FACT — C5-A Representation Geometry
 
-The current `task.md` is the frozen scientific authority for C5-A only.
+The completed C5-A contract remains the frozen scientific authority for C5-A.
 
 The following C5-A decisions are frozen:
 
@@ -230,24 +230,44 @@ Formal C5-A execution on the completed 200-record C4 paired dataset is complete:
   `p = 0.0196078431373`, `PASS`;
 - frozen C5-A geometry-stage result: `GO`.
 
-This `GO` authorizes proceeding to a separately contracted C5-B discussion only.
-It is not a final C5 PASS and does not freeze any C5-B or joint-gate decision.
+This `GO` authorized proceeding to a separately contracted C5-B discussion only.
+It was not by itself a final C5 PASS.
 
-### OPEN — C5-B and Final Joint C5 Gate
+### DECISION — C5-B and C5 Representation-Stage Joint Gate
 
-The following remain `OPEN` or `NOT STARTED`:
+The current `task.md` is the frozen scientific and implementation contract for
+C5-B. It freezes:
 
-- C5-B / SVCCA contract: `NOT STARTED`;
-- C5-B RNG: `OPEN`;
-- C5-B null protocol: `OPEN`;
-- C5-B thresholds and PASS/FAIL rule: `OPEN`;
-- final CKA + SVCCA joint C5 gate: `OPEN`;
-- final overall C5 PASS/FAIL rule: `OPEN`.
+- C5-B null repeats: `200`;
+- C5-B root RNG seed: `17`, using contract-defined independent TRAIN and
+  HELD-OUT `SeedSequence.spawn(2)` / PCG64 streams;
+- one shared fixed-point-free group-derangement bank across both representation
+  pairs and both PCA cutoffs;
+- the fit-and-evaluate null: refit ordinary CCA after TRAIN derangement and
+  evaluate it on an independently deranged HELD-OUT pairing;
+- C5-B PASS iff the true `O2 ↔ P2`, 99%-PCA, TRAIN-ordered HELD-OUT Top5Mean is
+  positive and its one-sided empirical `p <= 0.05`;
+- C5 representation-stage PASS iff `C5-A GO AND C5-B PASS`.
 
-Do not choose or infer any of these C5-B or final-joint decisions from the
-completed C5-A result. Formal C5-B evaluation and final overall C5 PASS/FAIL
-evaluation must not begin until their own scientific contracts are frozen and
-explicitly authorized.
+The C5-B scientific contract is frozen, but C5-B implementation and formal
+execution are both `NOT AUTHORIZED` until separately approved.
+
+### OPEN — Final Overall Research Gate and Later Stages
+
+The final overall research gate remains `OPEN / NOT DEFINED HERE`. A C5
+representation-stage PASS would not establish policy relevance, action relevance,
+adversarial transferability, or attack effectiveness.
+
+The following stages remain `NOT STARTED`:
+
+- policy/action relevance;
+- transferability evaluation;
+- Tex3D optimization.
+
+Do not begin C5-B implementation, formal C5-B execution, policy/action analysis,
+transferability evaluation, or Tex3D optimization without their required explicit
+authorization. Do not infer a final overall research PASS/FAIL from the frozen
+representation-stage rule.
 
 ---
 
