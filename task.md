@@ -1,1020 +1,121 @@
-# C5-A Representation Geometry Test Contract — Pilot v0.2
+# C5-B Explicit Shared-Space Alignment — Implementation Contract
 
-Status:
+**Status:** DRAFT v2.1 — FINAL READ-ONLY RE-AUDIT REQUIRED BEFORE IMPLEMENTATION
 
-```text
-DRAFT v3 — FINAL READ-ONLY RE-AUDIT REQUIRED BEFORE IMPLEMENTATION
-```
+This document defines the frozen scientific and implementation contract for **C5-B only**.
 
-This contract defines the formal C5-A representation-geometry test for the frozen Pilot v0.2 paired-feature dataset.
+It does **not** authorize implementation or formal execution by itself.
 
-It authorizes only:
-
-```text
-C5-A — cross-model representation geometry testing
-```
-
-It does not authorize C5-B SVCCA/CCA, explicit shared-space fitting, policy/action relevance analysis, adversarial loss construction, or Tex3D optimization.
+After this document is synchronized with repository governance state, Codex must perform a final read-only consistency audit. Only after that audit passes may C5-B implementation be explicitly authorized.
 
 ---
 
 ## 1. Scientific Question
 
-C5-A tests:
+C5-A has already established:
 
-> Do paired observations induce non-randomly consistent representation geometry across OpenVLA and π0.5?
+> Under the frozen Pilot v0.2 protocol, correctly paired OpenVLA and π0.5 observations induce non-randomly consistent global observation-level representation geometry.
 
-C5-A is only an existence-level geometry test.
+C5-B asks the stronger question:
 
-A positive result supports proceeding to a stronger shared-space alignment test.
+> Can paired OpenVLA and π0.5 representations be mapped, using TRAIN-only learned linear mappings, into an explicit candidate shared coordinate space whose canonical alignment generalizes to HELD-OUT observations beyond a frozen shuffled-null baseline?
 
-It does not establish:
+C5-B is therefore an:
 
 ```text
-shared == transferable
-shared == policy-relevant
-shared == action-relevant
+explicit linear shared-space alignment test
 ```
 
-and it does not prove that an explicit shared coordinate system already exists.
+A positive C5-B result supports:
+
+```text
+shared geometry
++
+explicit held-out-generalizing linear alignment
+```
+
+It does **not** establish:
+
+```text
+policy relevance
+action relevance
+adversarial vulnerability
+transferability
+attack-time usefulness
+```
+
+The hierarchy remains:
+
+```text
+shared != transferable != policy-relevant
+```
 
 ---
 
-## 2. Authoritative Input
+## 2. Upstream Preconditions
 
-The only valid C5-A scientific input is the completed formal C4 paired manifest:
+C5-B assumes the following upstream stages are complete and immutable:
 
 ```text
-schema_version = "paired_features_v1"
-num_samples = 200
+C5-D0 Formal Collection              PASS
+C2 OpenVLA Feature Extraction        PASS
+C3 π0.5 Feature Extraction           PASS
+C4 Formal Paired Features            PASS
+C5-A Representation Geometry         GO
 ```
 
-Runtime CLI:
+C5-A is closed.
+
+Formal C5-A primary result:
+
+```text
+O2 ↔ P2
+TRAIN debiased Linear CKA     = 0.528420895275
+HELD-OUT debiased Linear CKA  = 0.478168155531
+TRAIN empirical p             = 1/51
+HELD-OUT empirical p          = 1/51
+C5-A gate                     = GO
+```
+
+C5-B must not modify, reinterpret, recompute, or replace the formal C5-A conclusion.
+
+---
+
+## 3. Authoritative Inputs
+
+C5-B has **two required upstream inputs**.
+
+### 3.1 Formal C4 paired manifest
+
+Required CLI argument:
 
 ```text
 --paired-manifest
---output-dir
 ```
 
-C5-A must consume the exact 200 canonical paired records in the order serialized by the C4 manifest.
+Required schema:
 
-Do not reconstruct pairing by scanning feature directories.
-
-Do not replace, supplement, filter, reorder, or cherry-pick paired observations.
-
-Each paired record must resolve both:
-
-```text
-openvla_feature_path
-pi05_feature_path
-```
-
-and the existing paired `source_image_hash` integrity semantics must remain valid.
-
-### 2.1 Formal C4 identity validation
-
-Because `paired_features_v1` alone does not encode the full Pilot v0.2 / C2 / C3 manifest identity, C5-A must re-validate the formal feature archive provenance when loading each paired sample.
-
-This is provenance verification only.
-
-C5-A must reuse the existing frozen C2/C3/C4 archive/schema semantics or validators where practical and must not redefine provenance rules.
-
-For every OpenVLA archive, validate at minimum:
-
-```text
-logical checkpoint identity =
-openvla/openvla-7b-finetuned-libero-spatial
-
-expected source_model
-expected feature_schema_version
-sample_id
-source_image_hash
-required array keys
-exact required shapes
-saved dtype = float32
-all required arrays finite
-```
-
-For every π0.5 archive, validate at minimum:
-
-```text
-checkpoint identity =
-gs://openpi-assets/checkpoints/pi05_libero
-
-expected source_model
-expected feature_schema_version
-sample_id
-source_image_hash
-required array keys
-exact required shapes
-saved dtype = float32
-all required arrays finite
-```
-
-Cross-model validation must also confirm:
-
-```text
-paired sample_id matches both archives
-paired source_image_hash matches both archives
-```
-
-Do not treat an arbitrary or historical `paired_features_v1` manifest as formal Pilot v0.2 input merely because it has 200 records.
-
-If any required provenance or archive validation fails, stop before metric computation.
-
----
-
-## 3. Output Directory Admission Rule
-
-The path passed through:
-
-```text
---output-dir
-```
-
-must satisfy exactly one of:
-
-```text
-path does not exist
-```
-
-or:
-
-```text
-path exists and is empty
-```
-
-Any non-empty existing output directory must be rejected.
-
-Do not merge with, resume into, or partially reuse a previous formal C5-A output directory.
-
----
-
-## 4. Frozen Representation Pairs
-
-### Primary pair
-
-```text
-O2 ↔ P2
-```
-
-Archive mapping:
-
-```text
-OpenVLA O2  -> o2_projected   [256, 4096]
-π0.5 P2     -> p2_projected   [256, 2048]
-```
-
-This is the only representation pair that determines formal C5-A Go / No-Go.
-
-### Control pair
-
-```text
-O1-S ↔ P1
-```
-
-Archive mapping:
-
-```text
-OpenVLA O1-S -> o1_siglip   [256, 1152]
-π0.5 P1      -> p1_siglip   [256, 1152]
-```
-
-For the control pair, compute all three C5-A metrics:
-
-```text
-debiased Linear CKA
-biased Linear CKA
-Spearman RSA
-```
-
-The control pair does not determine the formal gate.
-
-### Supplementary OpenVLA node
-
-```text
-O1-F -> o1_fused [256, 2176]
-```
-
-O1-F remains supplementary and does not determine the formal gate.
-
-Do not redefine node semantics from shape alone.
-
----
-
-## 5. Statistical Unit
-
-The statistical unit is:
-
-```text
-one PilotObservation
-```
-
-not one visual token.
-
-Do not flatten the dataset into:
-
-```text
-200 × 256 token samples
-```
-
-and do not treat within-observation tokens as independent statistical observations.
-
-This avoids pseudo-replication from strongly dependent tokens belonging to the same image / rollout state.
-
----
-
-## 6. Per-Observation Representation
-
-For every frozen node tensor:
-
-```text
-[256, D]
-```
-
-construct one observation vector using simple arithmetic mean pooling over all 256 tokens:
-
-\[
-\bar{x}
-=
-\frac{1}{256}
-\sum_{t=1}^{256} x_t
-\]
-
-Thus:
-
-```text
-O2:    [256,4096] -> [4096]
-P2:    [256,2048] -> [2048]
-O1-S:  [256,1152] -> [1152]
-P1:    [256,1152] -> [1152]
-```
-
-No other pooling variant is part of the formal C5-A protocol.
-
-Do not perform:
-
-```text
-token selection
-token weighting
-attention pooling
-max pooling
-token reordering
-z-score normalization
-L2 normalization
-PCA
-CCA
-SVCCA
-dimensionality reduction
-```
-
-before the formal C5-A metrics.
-
-Mean pooling intentionally tests global observation-level geometry and is not interpreted as token-level spatial correspondence.
-
----
-
-## 7. Canonical Group Reconstruction and Progress-Slot Inheritance
-
-The group identity is:
-
-```text
-(task_id, initial_state_id)
-```
-
-The full C4 dataset must reconstruct as:
-
-```text
-10 tasks
-5 accepted groups per task
-50 groups total
-4 observations per group
-200 observations total
-```
-
-The canonical group order for all later C5-A operations is:
-
-> order of first appearance of each group in the canonical C4 paired-manifest record sequence.
-
-### 7.1 Required group validation
-
-For every reconstructed group, validate:
-
-```text
-exactly 4 records
-the 4 group records are contiguous in canonical C4 order
-step_id values are strictly increasing
-```
-
-### 7.2 Frozen progress-slot assignment
-
-The C4 paired manifest does not contain an explicit `target_relative_progress` field.
-
-Therefore C5-A must not claim to independently recover or prove the original target progress from C4 fields alone.
-
-Instead, after the group validation above succeeds, inherit the already validated Pilot v0.2 / C4 canonical provenance as follows:
-
-```text
-1st record in the group's canonical C4 block -> slot 0.10
-2nd record in the group's canonical C4 block -> slot 0.40
-3rd record in the group's canonical C4 block -> slot 0.70
-4th record in the group's canonical C4 block -> slot 0.90
-```
-
-This is:
-
-```text
-inherited slot assignment from validated upstream provenance
-```
-
-not:
-
-```text
-independent reconstruction of target_relative_progress from C4 fields
-```
-
-Do not infer another slot order from raw `step_id` spacing or relative magnitude.
-
----
-
-## 8. Deterministic Dataset Split
-
-The split unit is one full rollout group:
-
-```text
-(task_id, initial_state_id)
-```
-
-All four observations from one group must remain in the same split.
-
-For each group, serialize exactly:
-
-```text
-pilot-v0.2-c5-split-v1|task_id={task_id}|initial_state_id={initial_state_id}
-```
-
-Compute SHA-256 of the UTF-8 encoded string.
-
-Within each task, sort the five groups by:
-
-```text
-(sha256_hex_digest, initial_state_id)
-```
-
-in ascending lexicographic / numeric tuple order.
-
-Freeze:
-
-```text
-smallest ranked group -> HELD-OUT
-remaining four        -> TRAIN
-```
-
-Expected totals:
-
-```text
-TRAIN:
-40 groups
-160 observations
-
-HELD-OUT:
-10 groups
-40 observations
-```
-
-Every task must contribute exactly:
-
-```text
-4 TRAIN groups
-1 HELD-OUT group
-```
-
-Do not use random split assignment.
-
-Concrete held-out state IDs in the current frozen dataset may be used as regression expectations, but they are derived outputs, not scientific rules.
-
-The scientific rule is the SHA-256 ranking above.
-
----
-
-## 9. Primary Similarity Estimator: Debiased Linear CKA
-
-The formal primary estimator is:
-
-```text
-Debiased Linear CKA
-```
-
-C5-A operates in a low-sample / high-dimensional regime:
-
-```text
-N << D
-```
-
-so the primary estimator must use the frozen unbiased HSIC formulation below.
-
-### 9.1 Internal dtype
-
-All C5-A metric calculations must use:
-
-```text
-float64
-```
-
-internally after loading the saved float32 features.
-
-Do not silently calculate formal metrics in float32.
-
-### 9.2 Linear Gram matrices
-
-For a mean-pooled representation matrix:
-
-```text
-X ∈ R^(n × d_x)
-Y ∈ R^(n × d_y)
-```
-
-construct:
-
-\[
-K = XX^\top
-\]
-
-\[
-L = YY^\top
-\]
-
-using the raw mean-pooled vectors, with no extra feature normalization.
-
-### 9.3 Frozen unbiased HSIC formula
-
-Let:
-
-\[
-\tilde{K}
-\]
-
-and:
-
-\[
-\tilde{L}
-\]
-
-be copies of `K` and `L` with their diagonals set exactly to zero.
-
-For:
-
-```text
-n >= 4
-```
-
-define:
-
-\[
-\mathrm{HSIC}_u(K,L)
-=
-\frac{1}{n(n-3)}
-\left[
-\mathrm{tr}(\tilde{K}\tilde{L})
-+
-\frac{
-(\mathbf{1}^{\top}\tilde{K}\mathbf{1})
-(\mathbf{1}^{\top}\tilde{L}\mathbf{1})
-}{
-(n-1)(n-2)
-}
--
-\frac{2}{n-2}
-\mathbf{1}^{\top}\tilde{K}\tilde{L}\mathbf{1}
-\right]
-\]
-
-Use this exact formula for:
-
-```text
-HSIC_u(K,L)
-HSIC_u(K,K)
-HSIC_u(L,L)
-```
-
-Do not substitute another U-statistic, minibatch, centered-kernel, or library-specific HSIC variant.
-
-### 9.4 Frozen debiased CKA formula
-
-Define:
-
-\[
-\mathrm{CKA}_u
-=
-\frac{
-\mathrm{HSIC}_u(K,L)
-}{
-\sqrt{
-\mathrm{HSIC}_u(K,K)
-\mathrm{HSIC}_u(L,L)
-}
-}
-\]
-
-Behavior:
-
-- preserve negative `HSIC_u(K,L)` values;
-- preserve negative finite debiased CKA values;
-- do not clip results to `[0,1]`;
-- if either self-HSIC term is non-positive, stop with a validation error;
-- if the denominator is non-positive or non-finite, stop with a validation error;
-- if the final result is non-finite, stop with a validation error.
-
-Apply this exact estimator identically to:
-
-```text
-true pairing
-all shuffled-null pairings
-TRAIN
-HELD-OUT
-primary pair
-control pair
-```
-
----
-
-## 10. Diagnostic Metric: Standard Biased Linear CKA
-
-Also compute standard biased Linear CKA as:
-
-```text
-diagnostic / supporting only
-```
-
-It must not determine Go / No-Go.
-
-Use centered mean-pooled representation matrices:
-
-\[
-X_c = X - \mathrm{mean}(X,\text{axis}=0)
-\]
-
-\[
-Y_c = Y - \mathrm{mean}(Y,\text{axis}=0)
-\]
-
-and:
-
-\[
-\mathrm{CKA}_{biased}
-=
-\frac{
-\|X_c^\top Y_c\|_F^2
-}{
-\|X_c^\top X_c\|_F
-\|Y_c^\top Y_c\|_F
-}
-\]
-
-Use float64.
-
-Non-finite values or a non-positive denominator are validation errors.
-
-Do not use biased CKA for the formal gate.
-
----
-
-## 11. Robustness Metric: Spearman RSA
-
-Compute one robustness metric:
-
-```text
-Spearman Representational Similarity Analysis (RSA)
-```
-
-### 11.1 Frozen RSA convention
-
-For each split and representation pair:
-
-1. use the same raw mean-pooled observation vectors used by CKA;
-2. compute all pairwise squared Euclidean distances between observations within each model representation;
-3. extract the strict upper triangle only;
-4. exclude the diagonal;
-5. compare the two upper-triangular vectors with:
-
-```python
-scipy.stats.spearmanr
-```
-
-The Spearman statistic is the RSA value.
-
-Larger RSA means stronger agreement of pairwise geometry.
-
-### 11.2 Tie and validation behavior
-
-Use the standard SciPy Spearman rank convention, including average ranks for ties.
-
-Treat the following as validation errors:
-
-```text
-constant distance vector
-non-finite distance vector
-non-finite Spearman statistic
-```
-
-Do not switch between similarity and dissimilarity conventions across true/null runs.
-
-Apply the identical squared-Euclidean-distance convention to:
-
-```text
-true pairing
-all shuffled-null pairings
-TRAIN
-HELD-OUT
-primary pair
-control pair
-```
-
-RSA is robustness evidence only and does not determine the formal gate.
-
----
-
-## 12. Group-Block Shuffled Null
-
-The null hypothesis asks whether correct cross-model observation correspondence produces greater geometry similarity than deliberately incorrect group correspondence.
-
-The permutation unit is:
-
-```text
-(task_id, initial_state_id)
-```
-
-The four progress-slot observations in one group move together as one block.
-
-Within every moved group, preserve inherited slot correspondence:
-
-```text
-0.10 -> 0.10
-0.40 -> 0.40
-0.70 -> 0.70
-0.90 -> 0.90
-```
-
-Do not shuffle individual observations independently.
-
-Do not shuffle tokens.
-
-For every null repeat:
-
-```text
-OpenVLA group order remains fixed
-π0.5 group blocks are permuted
-```
-
----
-
-## 13. Frozen C5-A Null RNG and Derangement Sampling
-
-Freeze specifically for C5-A:
-
-```text
-C5-A null repeats = 50
-C5-A root RNG seed = 7
-```
-
-Use NumPy's random API as follows:
-
-```python
-root = np.random.SeedSequence(7)
-train_seed, heldout_seed = root.spawn(2)
-
-train_rng = np.random.Generator(np.random.PCG64(train_seed))
-heldout_rng = np.random.Generator(np.random.PCG64(heldout_seed))
-```
-
-This creates independent deterministic RNG streams for TRAIN and HELD-OUT.
-
-### 13.1 Group order
-
-Within each split, enumerate groups in the canonical group order defined by first appearance in the C4 paired-manifest sequence.
-
-### 13.2 Derangement sampler
-
-For each repeat and each split:
-
-```python
-perm = rng.permutation(n_groups)
-```
-
-Repeatedly draw until:
-
-```text
-perm[i] != i
-```
-
-for every group index `i`.
-
-Accept the first permutation with no fixed points.
-
-This rejection-sampling procedure is the frozen C5-A derangement sampler.
-
-Do not use Sattolo's algorithm.
-
-Do not force the permutation to be one cycle.
-
-Store the accepted permutation indices for reproducibility.
-
-### 13.3 Split independence
-
-TRAIN and HELD-OUT must use their separate spawned generators.
-
-Do not consume one shared RNG stream for both splits.
-
-Do not generate one 50-group permutation and then split it.
-
-### 13.4 Scope boundary
-
-These RNG decisions are frozen only for C5-A.
-
-They do not freeze:
-
-```text
-C5-B RNG
-SVCCA null protocol
-final joint C5 RNG convention
-```
-
-Those remain outside this contract.
-
----
-
-## 14. HELD-OUT Null Limitation
-
-HELD-OUT contains exactly one group per task.
-
-Therefore a same-task wrong-state permutation is impossible within HELD-OUT.
-
-The HELD-OUT null necessarily permits cross-task group mismatches.
-
-It must therefore be interpreted as:
-
-> a broad cross-group mismatch null
-
-and not as:
-
-> a task-conditioned state-level null.
-
-Do not change the frozen Pilot v0.2 split merely to remove this limitation.
-
----
-
-## 15. Metric Computation Under Null
-
-For every accepted null permutation, construct the π0.5 observation sequence by moving whole group blocks according to the permutation while preserving the four inherited within-group slots.
-
-For each null repeat, compute:
-
 ```text
-debiased Linear CKA
-biased Linear CKA
-Spearman RSA
+paired_features_v1
 ```
 
-for:
+Required count:
 
 ```text
-O2 ↔ P2
-O1-S ↔ P1
+200 paired observations
 ```
 
-on TRAIN and HELD-OUT independently.
+This is the authoritative paired-feature identity input.
 
-Use the exact same preprocessing and metric conventions as the true pairing.
+### 3.2 Formal C5-A output directory
 
----
+Required CLI argument:
 
-## 16. Primary C5-A Go / No-Go Statistic
-
-For the primary pair:
-
-```text
-O2 ↔ P2
-```
-
-and primary estimator:
-
-```text
-Debiased Linear CKA
-```
-
-compute separately for TRAIN and HELD-OUT:
-
-```text
-one true value
-50 shuffled-null values
-```
-
-Use the one-sided empirical permutation p-value:
-
-\[
-p_{\mathrm{emp}}
-=
-\frac{
-1+
-\sum_{r=1}^{R}
-\mathbf{1}
-[
-m_{\mathrm{null}}^{(r)}
-\ge
-m_{\mathrm{true}}
-]
-}{
-R+1
-}
-\]
-
-with:
-
-```text
-R = 50
-```
-
-The inequality direction is frozen as:
-
-```text
-null >= true
-```
-
-because larger debiased CKA indicates stronger geometry agreement.
-
-The smallest possible empirical p-value is:
-
-```text
-1 / 51 ≈ 0.0196078
-```
-
----
-
-## 17. C5-A Split-Level PASS Rule
-
-For each split independently:
-
-```text
-PASS(split)
-```
-
-iff both conditions hold:
-
-```text
-true debiased Linear CKA > 0
-```
-
-and:
-
-```text
-p_emp <= 0.05
-```
-
-With 50 null repeats, this means at most one null value may be greater than or equal to the true value.
-
----
-
-## 18. Formal C5-A Gate
-
-Freeze only the geometry-stage gate:
-
-```text
-C5-A GO
-iff
-TRAIN PASS
-AND
-HELD-OUT PASS
-```
-
-Only the primary pair O2 ↔ P2 and primary estimator debiased Linear CKA determine this C5-A gate.
-
-Possible C5-A outcomes:
-
-```text
-TRAIN PASS + HELD-OUT PASS
--> C5-A GO
-
-otherwise
--> C5-A NO-GO
-```
-
-A C5-A NO-GO means only:
-
-> the frozen C5-A analysis did not provide sufficient evidence for global observation-level shared geometry.
-
-It must not be interpreted as proof that no token-level, local, nonlinear, action-conditioned, or policy-relevant shared structure exists.
-
-A C5-A NO-GO does not authorize silently changing metrics, pooling, split, null construction, or thresholds.
-
-### 18.1 Explicit stage boundary
-
-This contract does not freeze:
-
-```text
-C5-B / SVCCA PASS rule
-C5-B RNG
-C5-B null protocol
-final CKA + SVCCA joint C5 gate
-final overall C5 PASS/FAIL rule
-```
-
-These remain:
-
-```text
-OPEN / NOT STARTED
-```
-
-until separately discussed and frozen.
-
----
-
-## 19. Required Null Summaries
-
-For every metric / pair / split null distribution, report:
-
-```text
-null mean
-null standard deviation
-null median
-null 95th percentile
-```
-
-Freeze:
-
-```python
-null_std = np.std(null_values, ddof=0)
-null_q95 = np.quantile(null_values, 0.95, method="linear")
-```
-
-Also report:
-
-```text
-true metric
-true - null median
-empirical p-value
-```
-
-The empirical p-value convention for RSA and diagnostic biased CKA is also:
-
-```text
-null >= true
-```
-
-but these supporting p-values do not determine the formal C5-A gate.
-
-Do not introduce arbitrary absolute CKA thresholds such as 0.2, 0.3, or 0.5.
-
----
-
-## 20. Interpretation of Control and Robustness Results
-
-### O1-S ↔ P1
-
-This pair is a shared-backbone control.
-
-Examples:
-
-```text
-O1-S↔P1 strong
-O2↔P2 strong
-```
-
-supports the interpretation that shared geometry survives VLA adaptation.
-
-```text
-O1-S↔P1 strong
-O2↔P2 weak
-```
-
-supports the interpretation that geometry may be shared mainly at the visual-backbone level and diverge after VLA adaptation.
-
-The control does not override the primary C5-A gate.
-
-### RSA
-
-If RSA agrees with debiased CKA:
-
 ```text
-true >> null
+--c5a-output-dir
 ```
-
-this strengthens cross-metric robustness.
-
-If RSA is weak while primary CKA passes, record the result as metric-sensitive evidence.
-
-Do not convert RSA into a second mandatory gate without contract revision.
-
-### Biased CKA
-
-Use biased CKA only to diagnose the practical effect of finite-sample/high-dimensional bias.
-
-It must not override debiased CKA.
-
----
-
-## 21. Formal Output Layout
 
-A successful formal C5-A run must create exactly the following core outputs inside `--output-dir`:
+The directory must contain the exact formal C5-A four-file artifact set:
 
 ```text
 split_manifest.json
@@ -1023,373 +124,1938 @@ null_metrics.npz
 summary.md
 ```
 
-Additional temporary files must not remain after successful completion.
-
-### 21.1 `split_manifest.json`
-
-Must record at minimum:
+C5-B reads and semantically validates:
 
 ```text
-schema/version identifier
-source paired-manifest path
-split rule identifier
-canonical group order
-per-group task_id
-per-group initial_state_id
-SHA-256 split digest
-TRAIN / HELD-OUT assignment
-canonical four sample_ids per group
-inherited progress-slot assignment
-held-out group per task
+split_manifest.json
+metric_summary.json
 ```
 
-### 21.2 `metric_summary.json`
-
-Must record at minimum:
+The presence of:
 
 ```text
-analysis schema/version
-primary pair
-control pair
-metric conventions
-C5-A RNG convention
-null repeat count
-TRAIN true metrics
-HELD-OUT true metrics
+null_metrics.npz
+summary.md
+```
+
+is validated only as part of formal C5-A artifact-set completeness.
+
+No additional files are allowed in the formal C5-A output directory.
+
+C5-B must validate:
+
+```text
+C5-A split schema == c5a_split_manifest_v1
+C5-A metric schema == c5a_metric_summary_v1
+C5-A run_status == COMPLETED
+C5-A c5a_gate == GO
+C5-A source_paired_manifest resolves to the same formal C4 manifest
+C5-A split counts match 50 groups / 200 observations
+C5-A split contains 40 TRAIN groups / 160 observations
+C5-A split contains 10 HELD-OUT groups / 40 observations
+```
+
+C5-B must not proceed if any of these checks fail.
+
+---
+
+## 4. Authoritative Split Provenance
+
+Pilot v0.2 defines the serialized C5 split manifest as the authoritative materialization of the frozen split rule.
+
+Therefore:
+
+> C5-B must inherit the formally materialized C5-A split.
+
+C5-B must **not** create an independent scientific split authority from C4 alone.
+
+It may independently recompute the deterministic split rule only as a **validation check**.
+
+The recomputed split must match the C5-A serialized split exactly.
+
+Mismatch is a validation error.
+
+Frozen statistical group:
+
+```text
+(task_id, initial_state_id)
+```
+
+Frozen split rule:
+
+```text
+pilot-v0.2-c5-split-v1|task_id={task_id}|initial_state_id={initial_state_id}
+```
+
+Digest:
+
+```text
+SHA-256 over exact UTF-8 bytes
+```
+
+Within each task:
+
+```text
+sort by (digest, initial_state_id) ascending
+lowest-ranked group -> HELD-OUT
+remaining four -> TRAIN
+```
+
+Regression-only expected HELD-OUT state IDs:
+
+```text
+task 0 -> 3
+task 1 -> 2
+task 2 -> 1
+task 3 -> 1
+task 4 -> 4
+task 5 -> 0
+task 6 -> 3
+task 7 -> 5
+task 8 -> 7
+task 9 -> 0
+```
+
+These expected IDs are not the rule.
+
+---
+
+## 5. Formal Archive Provenance Validation
+
+For every paired observation, C5-B must revalidate the frozen C2/C3/C4 provenance semantics.
+
+At minimum validate:
+
+```text
+sample_id
+source_image_hash
+paired sample_id equality
+paired source_image_hash equality
+archive existence
+required feature keys
+required feature shapes
+saved dtype == float32
+all required feature values finite
+expected source_model
+expected feature_schema_version
+expected checkpoint/config identity
+```
+
+Required model identities:
+
+```text
+OpenVLA logical checkpoint:
+openvla/openvla-7b-finetuned-libero-spatial
+
+π0.5 config:
+pi05_libero
+
+π0.5 checkpoint:
+gs://openpi-assets/checkpoints/pi05_libero
+```
+
+Required nodes:
+
+```text
+Primary:
+O2 ↔ P2
+
+Control:
+O1-S ↔ P1
+```
+
+Required raw shapes per observation:
+
+```text
+O2   [256, 4096]
+P2   [256, 2048]
+
+O1-S [256, 1152]
+P1   [256, 1152]
+```
+
+No upstream artifact may be modified.
+
+---
+
+## 6. Statistical Unit and Computational Rows
+
+The statistical unit remains the Pilot observation / trajectory-group structure.
+
+Token rows are:
+
+```text
+computational repeated measurements
+```
+
+and must **not** be treated as independent statistical observations.
+
+For each node:
+
+```text
+[N, 256, D]
+```
+
+C5-B uses position-aligned token-wise rows.
+
+TRAIN:
+
+```text
+[160, 256, D]
+->
+[40960, D]
+```
+
+HELD-OUT:
+
+```text
+[40, 256, D]
+->
+[10240, D]
+```
+
+Row correspondence:
+
+```text
+(i, t)_OpenVLA <-> (i, t)_π0.5
+```
+
+where:
+
+```text
+i = PilotObservation
+t = native spatial token index
+```
+
+The 256 token positions inherit the frozen 16×16 native spatial-token order.
+
+Token-index correspondence is an inherited positional anchor only.
+
+It must not be interpreted as proof of pure local semantic equivalence.
+
+Primary C5-B forbids:
+
+```text
+token reordering
+nearest-neighbor token matching
+learned token matching
+token selection
+token weighting
+token pooling
+```
+
+Full token-channel flattening is forbidden:
+
+```text
+[N, 256D]
+```
+
+---
+
+## 7. Numeric Precision
+
+Saved upstream arrays remain:
+
+```text
+float32
+```
+
+After loading, all formal C5-B:
+
+```text
+centering
+PCA/SVD
+CCA
+projection
+correlation
+null calculation
+summary statistics
+```
+
+must use:
+
+```text
+float64
+```
+
+Any non-finite intermediate or final formal value is a validation error.
+
+---
+
+## 8. PCA — Exact Frozen Definition
+
+C5-B uses model-specific TRAIN-only PCA.
+
+For each node independently:
+
+```text
+1. construct TRAIN token-row matrix X
+2. convert to float64
+3. compute feature-wise TRAIN mean μ
+4. center:
+   Xc = X - μ
+5. compute one economy SVD using exactly:
+```
+
+```python
+U, S, Vh = np.linalg.svd(Xc, full_matrices=False)
+V = Vh.T
+```
+
+This NumPy API choice and `full_matrices=False` are frozen.
+
+The mathematical identity is:
+
+```text
+Xc = U diag(S) V^T
+```
+
+No z-score, feature standardization, or L2 normalization is allowed.
+
+### 8.1 PCA explained variance
+
+Per-component variance weight is defined exactly as:
+
+```text
+e_j = S_j^2
+```
+
+The common multiplicative factor `1/(n-1)` is omitted because it cancels in the explained-variance ratio.
+
+Total variance weight:
+
+```text
+E = sum_j S_j^2
+```
+
+If:
+
+```text
+E <= 0
+```
+
+or non-finite, validation fails.
+
+For cutoff `tau`, define:
+
+```text
+d_tau =
+minimum k such that
+sum_{j=1..k} S_j^2 / E >= tau
+```
+
+Frozen cutoffs:
+
+```text
+primary:
+tau = 0.99
+
+robustness:
+tau = 0.95
+```
+
+### 8.2 One SVD per node
+
+Each node must compute its full TRAIN PCA/SVD exactly once.
+
+The 95% and 99% configurations use prefixes of the **same ordered PCA basis**:
+
+```text
+V_95 = V[:, :d_95]
+V_99 = V[:, :d_99]
+```
+
+No separate PCA refit is allowed for 95% vs 99%.
+
+### 8.3 Numerical rank
+
+Let:
+
+```text
+s_max = max(S)
+eps = np.finfo(np.float64).eps
+tol = max(Xc.shape) * eps * s_max
+```
+
+A singular value is numerically valid iff:
+
+```text
+S_j > tol
+```
+
+The cutoff-specific retained PCA dimension must not include numerically invalid components.
+
+If the minimum explained-variance cutoff would require a numerically invalid component, validation fails.
+
+If a cutoff-specific retained dimension is less than 10 on either side of a pair, validation fails.
+
+### 8.4 HELD-OUT transform
+
+HELD-OUT uses only frozen TRAIN parameters:
+
+```text
+μ
+V[:, :d_tau]
+```
+
+Transform:
+
+```text
+Z_heldout = (X_heldout - μ) @ V[:, :d_tau]
+```
+
+No HELD-OUT refit or recentering is allowed.
+
+---
+
+## 9. Ordinary Linear CCA — Exact Frozen Definition
+
+C5-B uses deterministic ordinary linear CCA implemented by covariance whitening plus SVD.
+
+No:
+
+```text
+ridge
+shrinkage
+regularization
+kernelization
+Deep CCA
+iterative neural optimization
+```
+
+is permitted.
+
+For a cutoff-specific TRAIN pair:
+
+```text
+Z_A in R^(n × d_A)
+Z_B in R^(n × d_B)
+```
+
+where both matrices are already derived from TRAIN-centered PCA projections.
+
+Define:
+
+```text
+C_AA = (Z_A^T Z_A) / (n - 1)
+C_BB = (Z_B^T Z_B) / (n - 1)
+C_AB = (Z_A^T Z_B) / (n - 1)
+```
+
+### 9.1 Covariance eigendecomposition
+
+Use exactly:
+
+```python
+lambda_A, Q_A = np.linalg.eigh(C_AA)
+lambda_B, Q_B = np.linalg.eigh(C_BB)
+```
+
+`np.linalg.eigh` returns eigenvalues in ascending order.
+
+Explicitly reorder each side into descending order using:
+
+```python
+order_A = np.argsort(lambda_A)[::-1]
+lambda_A = lambda_A[order_A]
+Q_A = Q_A[:, order_A]
+
+order_B = np.argsort(lambda_B)[::-1]
+lambda_B = lambda_B[order_B]
+Q_B = Q_B[:, order_B]
+```
+
+The mathematical identities are:
+
+```text
+C_AA = Q_A diag(lambda_A) Q_A^T
+C_BB = Q_B diag(lambda_B) Q_B^T
+```
+
+No alternate eigensolver is part of the formal contract.
+
+For each side define covariance tolerance:
+
+```text
+lambda_tol =
+max(d, 1) * eps * lambda_max
+```
+
+where:
+
+```text
+eps = np.finfo(np.float64).eps
+```
+
+A covariance eigenvalue is valid iff:
+
+```text
+lambda > lambda_tol
+```
+
+No tolerance-based ridge is allowed.
+
+Invalid/zero directions are removed from the whitening basis.
+
+If fewer than 10 valid covariance directions remain on either side, validation fails.
+
+Whitening matrices:
+
+```text
+P_A =
+Q_A_valid @ diag(lambda_A_valid^(-1/2))
+
+P_B =
+Q_B_valid @ diag(lambda_B_valid^(-1/2))
+```
+
+### 9.2 Whitened cross-covariance
+
+Construct:
+
+```text
+M = P_A^T @ C_AB @ P_B
+```
+
+Compute exactly:
+
+```python
+U, sigma, Vh = np.linalg.svd(M, full_matrices=False)
+V = Vh.T
+```
+
+The mathematical identity is:
+
+```text
+M = U diag(sigma) V^T
+```
+
+`np.linalg.svd` returns singular values in non-increasing order; this order is the frozen TRAIN canonical-component order.
+
+Singular values are interpreted as TRAIN canonical correlations.
+
+Canonical mappings:
+
+```text
+W_A = P_A @ U
+W_B = P_B @ V
+```
+
+Canonical variables:
+
+```text
+H_A = Z_A @ W_A
+H_B = Z_B @ W_B
+```
+
+### 9.3 Canonical-dimension count
+
+The valid canonical dimension count is:
+
+```text
+k = min(number of valid A whitening directions,
+        number of valid B whitening directions,
+        len(sigma))
+```
+
+Formal execution requires:
+
+```text
+k >= 10
+```
+
+### 9.4 Repeated canonical singular values
+
+If exact or numerically repeated canonical singular values occur, use the deterministic component order returned by the frozen SVD implementation.
+
+No secondary data-dependent reordering or tie-breaking is allowed.
+
+---
+
+## 10. Candidate Shared-Space Mapping Semantics
+
+The learned mappings are:
+
+```text
+candidate shared-space mappings
+```
+
+They must not be called:
+
+```text
+transferable mappings
+policy-relevant mappings
+attack mappings
+```
+
+CCA fitting is TRAIN-only.
+
+HELD-OUT uses frozen TRAIN:
+
+```text
+PCA mean
+PCA basis
+CCA mappings
+canonical component order
+sign orientation
+```
+
+---
+
+## 11. Held-Out Canonical Evaluation
+
+For each TRAIN-ordered canonical component `j`, compute HELD-OUT Pearson correlation by the exact direct formula.
+
+For vectors:
+
+```text
+x = H_A_heldout[:, j]
+y = H_B_heldout[:, j]
+```
+
+define:
+
+```text
+xc = x - mean(x)
+yc = y - mean(y)
+```
+
+and:
+
+```text
+rho_j_heldout =
+dot(xc, yc) / (norm(xc) * norm(yc))
+```
+
+All operations use float64.
+
+If either centered-vector norm is:
+
+```text
+<= 0
+```
+
+or non-finite, validation fails.
+
+Do not call an alternate Pearson implementation whose edge-case behavior may differ.
+
+No HELD-OUT:
+
+```text
+CCA refit
+component reorder
+best-component selection
+absolute value
+sign flipping
+```
+
+is allowed.
+
+Correlation must be finite.
+
+Constant canonical variates causing undefined Pearson correlation are validation errors.
+
+---
+
+## 12. Exact Evaluation Statistics
+
+All component indices below refer to frozen TRAIN CCA order.
+
+Define exactly:
+
+```text
+Top1 =
+rho_1
+
+Top5Mean =
+mean(rho_1, rho_2, rho_3, rho_4, rho_5)
+
+Top10Mean =
+mean(rho_1, ..., rho_10)
+```
+
+Primary statistic:
+
+```text
+HELD-OUT Top5Mean
+```
+
+Supporting metrics:
+
+```text
+HELD-OUT Top1
+HELD-OUT Top10Mean
+```
+
+Diagnostics:
+
+```text
+TRAIN Top5Mean
+TRAIN→HELD-OUT gap
+```
+
+Define TRAIN Top5Mean exactly from the TRAIN CCA singular values:
+
+```text
+TRAIN Top5Mean =
+mean(sigma_1, sigma_2, sigma_3, sigma_4, sigma_5)
+```
+
+Do not recompute TRAIN Pearson correlations from canonical variables.
+
+Gap:
+
+```text
+TRAIN Top5Mean - HELD-OUT Top5Mean
+```
+
+Top1, Top10Mean, TRAIN Top5Mean, and the gap never determine the formal gate.
+
+---
+
+## 13. Primary and Control Pairs
+
+Formal primary pair:
+
+```text
+O2 ↔ P2
+```
+
+Formal C5-B PASS/FAIL is determined only by:
+
+```text
+O2 ↔ P2
+99% PCA
+HELD-OUT Top5Mean
+```
+
+Control pair:
+
+```text
+O1-S ↔ P1
+```
+
+The control pair must compute the same:
+
+```text
+99% PCA analysis
+95% PCA robustness
+Top1
+Top5Mean
+Top10Mean
+TRAIN Top5Mean
+TRAIN→HELD-OUT gap
 null summaries
-empirical p-values
-split PASS statuses
-formal C5-A GO / NO-GO
-held-out-null limitation text
 ```
 
-### 21.3 `null_metrics.npz`
-
-Must contain sufficient machine-readable data to reproduce all null summaries, including at minimum:
-
-```text
-accepted TRAIN permutation indices
-accepted HELD-OUT permutation indices
-all 50 null metric values
-for each metric / pair / split
-```
-
-Freeze saved dtypes:
-
-```text
-permutation index arrays = int64
-metric arrays            = float64
-```
-
-### 21.4 `summary.md`
-
-Must provide a concise human-readable report of:
-
-```text
-data counts
-split
-primary true/null results
-control results
-RSA robustness
-biased-vs-debiased diagnostic
-formal C5-A gate
-held-out null limitation
-```
-
-Do not reinterpret a formal C5-A NO-GO as proof of no shared representation of any kind.
+The control pair never gates C5-B.
 
 ---
 
-## 22. Output Safety
+## 14. Primary C5-B Null Question
 
-Do not overwrite an existing non-empty output directory.
+The formal null asks:
 
-If a run fails before all validation and outputs are complete:
+> If cross-model correspondence is deliberately wrong, how strong an apparent HELD-OUT shared alignment can ordinary linear CCA produce from its fitting capacity?
+
+Therefore the null must:
 
 ```text
-no final metric_summary.json claiming completion
-no final summary.md claiming completion
+break TRAIN pairing
+refit CCA from scratch
+evaluate on independently broken HELD-OUT pairing
 ```
 
-The implementation may use temporary files/directories for safe-write behavior.
+It is insufficient to fit CCA on the correct TRAIN pairing and shuffle only HELD-OUT.
 
-Do not modify:
+---
+
+## 15. PCA Behavior Under Null
+
+PCA is pairing-independent.
+
+Therefore:
 
 ```text
-C2 feature archives
-C3 feature archives
-C4 paired manifest
-PilotObservation files
+PCA is fit once per node on the true TRAIN row set
+```
+
+and reused for:
+
+```text
+true analysis
+all 200 null repeats
+99% cutoff
+95% cutoff
+```
+
+The only cutoff-specific difference is the prefix length of the same PCA basis.
+
+No null-repeat PCA refit is allowed.
+
+---
+
+## 16. Group-Block Fit-and-Evaluate Null
+
+Null unit:
+
+```text
+(task_id, initial_state_id)
+```
+
+Within a moved group preserve:
+
+```text
+all four progress slots together
+all 256 token positions in native order
+```
+
+For repeat `r`:
+
+### 16.1 TRAIN null
+
+Keep OpenVLA fixed.
+
+Derange π0.5 TRAIN groups:
+
+```text
+g_i^A <-> g_{pi_train_r(i)}^B
+```
+
+with:
+
+```text
+pi_train_r(i) != i
+```
+
+for every TRAIN group.
+
+Preserve:
+
+```text
+0.10 <-> 0.10
+0.40 <-> 0.40
+0.70 <-> 0.70
+0.90 <-> 0.90
+
+token 0 <-> token 0
+...
+token 255 <-> token 255
+```
+
+Using this wrong TRAIN pairing:
+
+```text
+refit ordinary linear CCA from scratch
+```
+
+to obtain repeat-specific null mappings.
+
+### 16.2 HELD-OUT null
+
+Independently derange π0.5 HELD-OUT groups.
+
+Keep OpenVLA HELD-OUT fixed.
+
+Apply:
+
+```text
+frozen TRAIN PCA
+repeat-specific null CCA mappings
+```
+
+Then compute HELD-OUT:
+
+```text
+Top1
+Top5Mean
+Top10Mean
+```
+
+using frozen TRAIN canonical order and sign orientation.
+
+---
+
+## 17. HELD-OUT Null Limitation
+
+HELD-OUT contains one group per task.
+
+Therefore a fixed-point-free HELD-OUT derangement necessarily permits cross-task mismatch.
+
+The HELD-OUT null is:
+
+```text
+a broad cross-group mismatch null
+```
+
+not:
+
+```text
+a task-conditioned state-level mismatch null
+```
+
+Formal summaries must surface this limitation.
+
+C5-B must not be interpreted as proving:
+
+> same-state shared alignment after conditioning on fixed task identity.
+
+---
+
+## 18. Null Repeats
+
+Formal repeats:
+
+```text
+R = 200
+```
+
+Empirical p-value:
+
+```text
+p_emp =
+(1 + # {null >= true}) / 201
+```
+
+Minimum possible p:
+
+```text
+1 / 201
+```
+
+Formal threshold:
+
+```text
+p_emp <= 0.05
+```
+
+Therefore at most 9 null values may satisfy:
+
+```text
+null >= true
+```
+
+for formal PASS.
+
+---
+
+## 19. C5-B RNG — Exact Frozen Convention
+
+C5-B root seed:
+
+```text
+17
+```
+
+Exact initialization:
+
+```python
+root = np.random.SeedSequence(17)
+
+train_seed, heldout_seed = root.spawn(2)
+
+train_rng = np.random.Generator(
+    np.random.PCG64(train_seed)
+)
+
+heldout_rng = np.random.Generator(
+    np.random.PCG64(heldout_seed)
+)
+```
+
+Within each split, group order is defined by first appearance in the canonical C4 paired-manifest sequence and must match the inherited C5-A split materialization.
+
+For each repeat:
+
+```python
+perm = rng.permutation(n_groups)
+```
+
+Repeatedly draw until the first fixed-point-free permutation is obtained.
+
+Accept that first derangement.
+
+Forbidden:
+
+```text
+Sattolo
+forced single-cycle construction
+hand-generated derangements
+```
+
+Accepted permutation indices must be stored.
+
+---
+
+## 20. One Shared Permutation Bank for All Configurations
+
+The same exact:
+
+```text
+200 TRAIN derangements
+200 HELD-OUT derangements
+```
+
+must be reused across **all four configurations**:
+
+```text
+O2 ↔ P2, 99%
+O2 ↔ P2, 95%
+O1-S ↔ P1, 99%
+O1-S ↔ P1, 95%
+```
+
+This isolates:
+
+```text
+pair choice
+PCA cutoff
+```
+
+from random-null variation.
+
+---
+
+## 21. Null Metric Semantics
+
+For every configuration and every null repeat, formal stored null metrics are HELD-OUT only:
+
+```text
+Top1
+Top5Mean
+Top10Mean
+```
+
+TRAIN null metrics are not part of the formal artifact.
+
+For each HELD-OUT metric report:
+
+```text
+true
+null mean
+null std
+null median
+null q95
+true - null median
+empirical p
+```
+
+Use exactly:
+
+```python
+np.std(null_values, ddof=0)
+```
+
+and:
+
+```python
+np.quantile(null_values, 0.95, method="linear")
+```
+
+Empirical p-values are required for all three HELD-OUT metrics.
+
+Only Top5Mean determines the formal C5-B gate.
+
+---
+
+## 22. C5-B Primary PASS / FAIL Rule
+
+Formal primary configuration:
+
+```text
+O2 ↔ P2
+99% TRAIN-only PCA
+ordinary linear CCA
+```
+
+Formal primary statistic:
+
+```text
+TRAIN-order HELD-OUT Top5Mean
+```
+
+C5-B PASS iff:
+
+```text
+true HELD-OUT Top5Mean > 0
+AND
+empirical p <= 0.05
+```
+
+against the frozen fit-and-evaluate group-block null.
+
+No absolute correlation threshold is part of the gate.
+
+The following are non-gating:
+
+```text
+Top1
+Top10Mean
+TRAIN Top5Mean
+TRAIN→HELD-OUT gap
+95% robustness
+O1-S↔P1 control
+```
+
+Formal code must not classify alignment as:
+
+```text
+strong
+weak
+```
+
+using any unstated threshold.
+
+Every formal result must instead include the fixed interpretation note:
+
+> Statistical significance relative to the frozen null does not by itself imply strong practical alignment; raw HELD-OUT Top5Mean and null effect-size summaries must be interpreted directly.
+
+---
+
+## 23. 95% PCA Robustness
+
+The 95% configuration is required.
+
+It uses:
+
+```text
+same TRAIN/HELD-OUT split
+same token-row semantics
+same node-specific full PCA SVD
+same permutation bank
+same CCA definition
+same metrics
+```
+
+It does not independently gate C5-B.
+
+Qualitative interpretation only:
+
+```text
+99% and 95% both similar:
+alignment is robust to PCA cutoff
+
+99% stronger than 95%:
+alignment may depend on lower-variance retained directions
+
+95% stronger than 99%:
+99% retained tail may introduce noise or conditioning burden
+```
+
+Do not switch the primary cutoff based on observed results.
+
+---
+
+## 24. C5-B Scientific Interpretation
+
+If C5-B PASS:
+
+> The frozen C5-B analysis provides evidence that TRAIN-only learned linear mappings produce an explicit candidate shared coordinate system whose primary canonical alignment generalizes to HELD-OUT paired observations beyond the frozen fit-and-evaluate mismatch null.
+
+If C5-B FAIL:
+
+> The frozen C5-B analysis does not provide sufficient evidence that the current linear SVCCA formulation yields a stable explicit shared coordinate system that generalizes to HELD-OUT observations.
+
+C5-B FAIL does not prove absence of:
+
+```text
+nonlinear shared structure
+local/token-specific shared structure
+alternative alignment formulations
+policy-relevant shared structure
 ```
 
 ---
 
-## 23. Implementation Scope
+## 25. C5 Representation-Stage Joint Gate — Frozen
 
-Preferred new implementation files:
+This gate is **not** the final overall research conclusion.
 
-```text
-scripts/c5a_representation_geometry.py
-tests/test_c5a_representation_geometry.py
-```
+It is only the representation-analysis joint gate.
 
-A small helper module may be added only if it materially improves testability.
-
-Prefer not to modify:
+Define:
 
 ```text
-shared_feature/openvla_features.py
-shared_feature/pi05_features.py
-shared_feature/paired_features.py
-scripts/c2_full_feature_extraction.py
-scripts/c3_full_feature_extraction.py
-scripts/c4_full_paired_features.py
+C5 representation-stage PASS
+iff
+C5-A GO
+AND
+C5-B PASS
 ```
 
-If implementing the frozen estimator, archive provenance verification, or formal C4 loading requires a production-module change, stop and report the blocker before expanding scope.
+Since C5-A is already frozen as:
 
-Do not run model inference.
+```text
+GO
+```
+
+the remaining representation-stage condition is C5-B.
+
+If representation-stage PASS:
+
+> The shared-representation hypothesis is supported under frozen Pilot v0.2 at the level of both reproducible global observation geometry and an explicit HELD-OUT-generalizing linear alignment.
+
+This still does **not** establish:
+
+```text
+policy relevance
+action relevance
+adversarial transferability
+attack effectiveness
+```
+
+If:
+
+```text
+C5-A GO
+C5-B FAIL
+```
+
+then:
+
+> Global representation geometry is supported, but the current linear SVCCA formulation does not provide sufficient evidence for a stable explicit shared coordinate system.
+
+### 25.1 Final overall research gate
+
+The final overall research PASS/FAIL beyond representation analysis remains:
+
+```text
+OPEN / NOT DEFINED HERE
+```
+
+C5-B must not define or imply a final overall project success criterion.
 
 ---
 
-## 24. Required Tests
+## 26. Formal CLI
 
-Tests must be CPU-only.
-
-Do not run OpenVLA, π0.5, LIBERO, CUDA, or JAX workloads.
-
-Test at least:
-
-1. exact C4 paired-manifest loading and 200-pair validation;
-2. formal OpenVLA checkpoint identity validation;
-3. formal π0.5 checkpoint identity validation;
-4. source_model and feature_schema_version validation;
-5. paired/archive `sample_id` agreement;
-6. paired/archive `source_image_hash` agreement;
-7. required array keys/shapes/float32/finiteness validation;
-8. deterministic group reconstruction;
-9. every group has exactly four records;
-10. group records are contiguous in canonical C4 order;
-11. group `step_id` values are strictly increasing;
-12. progress slots are inherited as canonical record positions `[0.10,0.40,0.70,0.90]`;
-13. canonical group order equals first appearance in C4 order;
-14. exact SHA-256 split serialization;
-15. split sorting uses `(digest, initial_state_id)`;
-16. one held-out group per task;
-17. totals of 40 TRAIN / 10 HELD-OUT groups;
-18. totals of 160 TRAIN / 40 HELD-OUT observations;
-19. all four observations from a group remain together;
-20. mean pooling maps `[256,D] -> [D]`;
-21. no forbidden preprocessing is applied;
-22. exact unbiased HSIC formula on controlled synthetic matrices;
-23. debiased Linear CKA on controlled synthetic examples;
-24. negative finite debiased CKA is preserved;
-25. non-positive self-HSIC / denominator is rejected;
-26. standard biased Linear CKA diagnostic path;
-27. squared-Euclidean Spearman RSA on controlled synthetic examples;
-28. RSA constant/non-finite inputs are rejected;
-29. `SeedSequence(7).spawn(2)` convention is exact;
-30. PCG64 TRAIN and HELD-OUT streams are deterministic and independent;
-31. every accepted null permutation is a derangement;
-32. rejection sampler does not impose one-cycle structure;
-33. OpenVLA order remains fixed while π0.5 group blocks move;
-34. progress-slot order is preserved inside moved groups;
-35. exactly 50 accepted null permutations per split;
-36. empirical p-value uses the frozen `+1` formula and `null >= true`;
-37. null standard deviation uses `ddof=0`;
-38. null q95 uses `method="linear"`;
-39. control pair computes all three metrics;
-40. split-level PASS rule is exact;
-41. formal C5-A GO requires both TRAIN and HELD-OUT PASS;
-42. `null_metrics.npz` permutation arrays are int64;
-43. `null_metrics.npz` metric arrays are float64;
-44. non-empty output directory is rejected;
-45. existing inputs are never modified;
-46. failed run cannot leave final outputs claiming completion.
-
-Where possible, use synthetic examples with known expected high similarity, low similarity, and shuffled correspondence behavior.
-
----
-
-## 25. Required Checks
-
-After implementation run at minimum:
+Formal CLI:
 
 ```bash
-python -m pytest \
-  tests/test_c5a_representation_geometry.py \
-  -q
+python scripts/c5b_explicit_shared_space.py \
+  --paired-manifest <paired_features_manifest.json> \
+  --c5a-output-dir <formal_c5a_output_dir> \
+  --output-dir <new-or-empty-output-dir>
 ```
 
-Also run relevant C4 regression tests and the full test suite if practical.
+No formal scientific constant may be user-selectable.
+
+Do not expose CLI arguments for:
+
+```text
+seed
+R
+PCA cutoff
+pair
+metric
+threshold
+CCA regularization
+```
+
+The output directory must:
+
+```text
+not exist
+```
+
+or:
+
+```text
+exist and be empty
+```
+
+Non-empty output is rejected.
+
+No resume/merge behavior.
+
+---
+
+## 27. Formal Output Set — Exact
+
+Successful formal execution must produce **exactly four files**:
+
+```text
+split_manifest.json
+alignment_summary.json
+null_alignment_metrics.npz
+summary.md
+```
+
+No additional formal files are allowed.
+
+---
+
+## 28. split_manifest.json — Exact Schema
+
+Schema version:
+
+```text
+c5b_split_manifest_v1
+```
+
+Exact top-level keys:
+
+```text
+schema_version
+source_paired_manifest
+source_c5a_split_manifest
+split_rule_id
+counts
+heldout_state_by_task
+canonical_group_order
+groups
+```
+
+Path fields:
+
+```text
+source_paired_manifest
+source_c5a_split_manifest
+```
+
+must be absolute resolved filesystem paths recorded as runtime provenance.
+
+`groups` must preserve canonical C4/C5-A order and include exact keys:
+
+```text
+canonical_group_index
+task_id
+initial_state_id
+assignment
+sample_ids
+step_ids
+inherited_progress_slots
+```
+
+C5-B split output must exactly reproduce the validated C5-A split assignments.
+
+---
+
+## 29. alignment_summary.json — Exact Schema
+
+Schema version:
+
+```text
+c5b_alignment_summary_v1
+```
+
+Exact top-level keys:
+
+```text
+schema_version
+run_status
+source_paired_manifest
+source_c5a_metric_summary
+source_c5a_split_manifest
+c5a_gate
+primary_pair
+control_pair
+pca
+cca
+null
+results
+c5b_result
+representation_stage_result
+heldout_null_limitation
+interpretation_boundary
+```
+
+Allowed values:
+
+```text
+run_status:
+COMPLETED
+
+c5a_gate:
+GO
+
+c5b_result:
+PASS | FAIL
+
+representation_stage_result:
+PASS | FAIL
+```
+
+All three source path fields:
+
+```text
+source_paired_manifest
+source_c5a_metric_summary
+source_c5a_split_manifest
+```
+
+must be absolute resolved filesystem paths.
+
+`primary_pair` exact keys and exact values:
+
+```text
+name          = "o2_p2"
+openvla_node  = "O2"
+pi05_node     = "P2"
+gates_c5b     = true
+```
+
+`control_pair` exact keys and exact values:
+
+```text
+name          = "o1s_p1"
+openvla_node  = "O1-S"
+pi05_node     = "P1"
+gates_c5b     = false
+```
+
+`pca` must contain exactly these node keys:
+
+```text
+o2
+p2
+o1s
+p1
+```
+
+Each node object must contain exactly:
+
+```text
+full_rank
+d_95
+d_99
+explained_variance_95
+explained_variance_99
+```
+
+Definitions:
+
+```text
+full_rank =
+count(S_j > tol)
+
+explained_variance_95 =
+actual cumulative sum(S[:d_95]^2) / sum(S^2)
+
+explained_variance_99 =
+actual cumulative sum(S[:d_99]^2) / sum(S^2)
+```
+
+The explained-variance fields must contain the actual achieved ratios and must not be hard-coded to `0.95` or `0.99`.
+
+`cca` must contain exactly:
+
+```text
+method
+covariance_denominator
+eigendecomposition_api
+svd_api
+regularization
+min_valid_canonical_dims
+```
+
+with exact values:
+
+```text
+method =
+"ordinary_linear_covariance_whitening_svd"
+
+covariance_denominator =
+"n_minus_1"
+
+eigendecomposition_api =
+"numpy.linalg.eigh"
+
+svd_api =
+"numpy.linalg.svd_full_matrices_false"
+
+regularization =
+"none"
+
+min_valid_canonical_dims =
+10
+```
+
+`null` must contain exactly:
+
+```text
+repeats
+root_seed
+rng
+sampler
+train_group_count
+heldout_group_count
+shared_bank_across_configurations
+```
+
+with exact values:
+
+```text
+repeats = 200
+root_seed = 17
+rng = "SeedSequence.spawn(2)+PCG64"
+sampler = "first_fixed_point_free_rng_permutation"
+train_group_count = 40
+heldout_group_count = 10
+shared_bank_across_configurations = true
+```
+
+`heldout_null_limitation` must be the exact string:
+
+```text
+"HELD-OUT contains one group per task; the fixed-point-free HELD-OUT derangement is therefore a broad cross-group mismatch null, not a task-conditioned state-level mismatch null."
+```
+
+`interpretation_boundary` must be the exact string:
+
+```text
+"Statistical significance relative to the frozen null does not by itself imply strong practical alignment; C5 representation-stage PASS does not establish policy relevance, action relevance, adversarial transferability, or attack effectiveness."
+```
+
+`results` must contain exactly four configuration entries:
+
+```text
+o2_p2__99
+o2_p2__95
+o1s_p1__99
+o1s_p1__95
+```
+
+Each configuration must contain:
+
+```text
+train_top5mean
+heldout_top1
+heldout_top5mean
+heldout_top10mean
+train_to_heldout_top5mean_gap
+null_summary
+```
+
+`null_summary` must contain exactly:
+
+```text
+top1
+top5mean
+top10mean
+```
+
+Each metric summary must contain:
+
+```text
+true
+null_mean
+null_std
+null_median
+null_q95
+true_minus_null_median
+empirical_p
+```
+
+---
+
+## 30. null_alignment_metrics.npz — Exact Keys
+
+The NPZ must contain exactly:
+
+```text
+train_permutations
+heldout_permutations
+
+o2_p2__99__heldout_top1
+o2_p2__99__heldout_top5mean
+o2_p2__99__heldout_top10mean
+
+o2_p2__95__heldout_top1
+o2_p2__95__heldout_top5mean
+o2_p2__95__heldout_top10mean
+
+o1s_p1__99__heldout_top1
+o1s_p1__99__heldout_top5mean
+o1s_p1__99__heldout_top10mean
+
+o1s_p1__95__heldout_top1
+o1s_p1__95__heldout_top5mean
+o1s_p1__95__heldout_top10mean
+```
+
+Exact dtypes/shapes:
+
+```text
+train_permutations:
+int64 [200, 40]
+
+heldout_permutations:
+int64 [200, 10]
+
+all metric arrays:
+float64 [200]
+```
+
+No extra arrays are allowed.
+
+---
+
+## 31. summary.md — Required Content
+
+`summary.md` must contain:
+
+```text
+C5-B PASS/FAIL
+C5 representation-stage PASS/FAIL
+primary O2↔P2 99% true/null summary
+95% robustness summary
+control-pair summary
+actual retained PCA dimensions
+TRAIN→HELD-OUT diagnostic gap
+held-out null limitation
+fixed interpretation boundary
+```
+
+It must explicitly state:
+
+> Statistical significance relative to the frozen null does not by itself imply strong practical alignment.
+
+It must also state:
+
+> C5 representation-stage PASS does not establish policy relevance, action relevance, adversarial transferability, or attack effectiveness.
+
+---
+
+## 32. Output Safety
+
+Use staged output publication.
+
+A failed run must not leave a final output directory that appears formally complete.
+
+Input artifacts must remain immutable.
+
+No partially written:
+
+```text
+PASS
+FAIL
+COMPLETED
+```
+
+formal artifact may remain after failure.
+
+Successful publication must produce the exact four-file set and exact schemas above.
+
+---
+
+## 33. Memory / Compute Discipline
+
+This section is an implementation constraint, not a scientific change.
+
+Formal code should process one representation pair at a time:
+
+```text
+1. O2 ↔ P2
+2. release unnecessary pair-specific arrays/workspace
+3. O1-S ↔ P1
+```
+
+Do not require all four full float64 token-feature tensors to remain resident simultaneously.
+
+Each node's full TRAIN PCA/SVD is computed once.
+
+The implementation should reuse:
+
+```text
+fixed PCA transforms
+cutoff-specific covariance/whitening structure where mathematically valid
+shared null permutation banks
+```
+
+Do not implement the null as hundreds of full iterative CCA training jobs.
+
+Use the frozen closed-form linear-algebra CCA.
+
+---
+
+## 34. Required Validation
+
+Implementation must validate at least:
+
+```text
+formal C4 paired schema
+exact 200 pairs
+exact C5-A four-file artifact set
+C5-A split schema
+C5-A metric schema
+C5-A run_status == COMPLETED
+C5-A gate == GO
+C5-A and C5-B source C4 identity match
+C5-A serialized split matches recomputed frozen rule
+canonical sample order
+sample IDs
+source hashes
+archive paths
+model identities
+feature schema versions
+required keys
+required shapes
+saved float32 dtype
+finiteness
+50 groups
+5 groups/task
+4 observations/group
+contiguous group ordering
+strictly increasing step IDs
+position-aligned token-row construction
+PCA total variance
+PCA numerical rank
+95%/99% prefix relationship
+CCA covariance numerical rank
+>=10 valid canonical dimensions
+finite canonical correlations
+finite null arrays
+fixed-point-free derangements
+RNG reproducibility
+same permutation bank across all four configurations
+exact output dtypes
+exact output schemas
+exact output file set
+```
+
+---
+
+## 35. Required Unit Tests
+
+Tests must be CPU-only and synthetic.
+
+At minimum test:
+
+```text
+C4 provenance rejection
+C5-A artifact provenance rejection
+C5-A incomplete/extra-file artifact-set rejection
+C5-A non-GO rejection
+C5-A source-manifest mismatch rejection
+C5-A split mismatch rejection
+group reconstruction
+exact SHA-256 split validation
+position-aligned token flattening
+TRAIN-only centering
+single full PCA SVD per node
+99% minimum-prefix selection
+95% minimum-prefix selection
+95% prefix contained in 99% prefix
+zero-variance PCA rejection
+PCA numerical-rank rejection
+HELD-OUT transform without refit
+ordinary covariance-whitening CCA
+CCA rank-deficiency rejection
+>=10 canonical-dimension requirement
+TRAIN component order preserved on HELD-OUT
+no abs(correlation)
+Top1 exact definition
+Top5Mean exact definition
+Top10Mean exact definition
+TRAIN→HELD-OUT gap
+TRAIN group-block movement
+HELD-OUT group-block movement
+progress-slot preservation
+token-position preservation
+CCA refit for every null repeat
+PCA not refit per null repeat
+R=200
+SeedSequence(17).spawn(2)
+PCG64 deterministic replay
+derangement rejection sampling
+same bank reused by all four configurations
+empirical p-value
+ddof=0 null std
+linear q95
+supporting metric p-values produced
+primary gate uses only O2↔P2 99% Top5Mean
+control never gates
+95% never gates
+representation-stage result = C5-A GO AND C5-B PASS
+no strong/weak automatic classification
+non-empty output rejection
+failed publication leaves no formal completed output
+exact four-file output set
+exact JSON top-level schemas
+exact NPZ keys/dtypes/shapes
+input artifacts remain unchanged
+```
+
+---
+
+## 36. Required Checks After Implementation
 
 Run:
 
 ```text
+focused C5-B tests
+relevant C4 regression tests
+relevant C5-A regression tests
+full unit suite if practical
 Ruff check
-Ruff format check
+Ruff format --check
 git diff --check
 ```
 
-C5-A is CPU analysis over already extracted feature artifacts and must not trigger real model inference.
+Inspect final diff for scope creep.
 
 ---
 
-## 26. Documentation Synchronization Required Before Coding
+## 37. Explicitly Out of Scope
 
-The following decisions are now frozen specifically for C5-A:
+C5-B must not implement:
 
 ```text
-C5-A primary geometry contract
-C5-A primary estimator
-C5-A supporting metrics
-C5-A null RNG seed / exact RNG convention
-C5-A geometry-stage Go / No-Go rule
+policy/action relevance
+action gradients
+Jacobian analysis
+shared-policy direction selection
+adversarial loss
+Tex3D texture optimization
+held-out attack evaluation
+Deep CCA
+Kernel CCA
+Ridge CCA
+PWCCA as a formal gate
+token matching
+token weighting
+learned alignment networks
 ```
 
-Before implementation authorization, synchronize:
+Do not automatically begin later roadmap stages after C5-B.
+
+---
+
+## 38. Formal Execution Boundary
+
+Implementation and formal execution are separate authorizations.
+
+After coding:
+
+```text
+1. run CPU unit/regression/static checks
+2. stop
+3. report implementation
+4. perform independent read-only code audit
+5. only then authorize formal C5-B execution
+```
+
+Formal C5-B execution must not begin during implementation authorization unless explicitly requested.
+
+---
+
+## 39. Documentation Synchronization Required Before Coding
+
+Before implementation authorization, Codex may make the minimal state-only synchronization edits required in:
 
 ```text
 AGENTS.md
 docs/research-map.md
 ```
 
-The synchronized documents must explicitly distinguish C5-A from later C5 stages.
+No separate scientific redesign is required for those edits.
 
-Required status:
+They must reflect that the following are now frozen for C5-B:
 
 ```text
-C5-A geometry contract:
-FROZEN
-
-C5-A null RNG:
-FROZEN = 7
-
-C5-A geometry-stage GO/NO-GO:
-FROZEN
-
-C5-B / SVCCA contract:
-NOT STARTED
-
-C5-B RNG:
-OPEN
-
-C5-B PASS/FAIL:
-OPEN
-
-final CKA + SVCCA joint C5 gate:
-OPEN
-
-final overall C5 PASS/FAIL rule:
-OPEN
+R = 200
+root seed = 17
+exact TRAIN/HELD-OUT derangement convention
+fit-and-evaluate null
+C5-B PASS/FAIL
+C5 representation-stage joint gate
 ```
 
-The synchronized documents must make clear that:
+The documents must also explicitly preserve:
 
-> this independent C5-A scientific contract is the frozen authority only for C5-A decisions.
+```text
+final overall research gate:
+OPEN / NOT DEFINED HERE
+```
 
-Documentation synchronization must not change the scientific rules in this contract.
+Do not modify:
+
+```text
+docs/pilot-v0.2-spec.md
+```
+
+unless a genuine scientific contradiction is discovered.
 
 ---
 
-## 27. Explicitly Out of Scope
+## 40. Final Read-Only Re-Audit Required
 
-Do not implement or discuss as part of this coding task:
-
-```text
-SVCCA
-CCA fitting
-PCA for shared-space alignment
-Procrustes alignment
-PWCCA
-GULP
-kNN overlap
-action relevance
-policy relevance
-shared-feature attack loss
-Tex3D optimization
-transfer attack evaluation
-final joint C5 decision rule
-```
-
-Those belong to later stages.
-
----
-
-## 28. Final Read-Only Re-Audit Before Coding
-
-Before implementation, Codex must perform one final read-only re-audit against:
+Before coding authorization, Codex must perform a read-only audit of:
 
 ```text
+task.md
 AGENTS.md
 docs/research-map.md
 docs/pilot-v0.2-spec.md
-current task.md
-formal C4 paired manifest
-current feature archive schemas
-existing C2/C3/C4 implementation and tests
+existing C2/C3/C4/C5-A implementation interfaces
+formal C5-A artifact schemas
 ```
 
-The re-audit must confirm:
-
-1. documentation no longer conflicts with the frozen C5-A RNG or C5-A geometry-stage gate;
-2. documentation still leaves C5-B and final joint C5 gate OPEN / NOT STARTED;
-3. formal C4 identity is sufficiently revalidated without modifying the C4 schema;
-4. OpenVLA and π0.5 checkpoint identities are exact;
-5. source_model / feature schema / sample / hash / array validation is unambiguous;
-6. progress-slot semantics are explicitly inherited rather than independently recovered;
-7. the exact unbiased HSIC formula is unambiguous;
-8. debiased CKA denominator/error behavior is unambiguous;
-9. float64 internal computation is feasible;
-10. the squared-Euclidean Spearman RSA convention is unambiguous;
-11. the deterministic split can be reconstructed exactly;
-12. canonical group reconstruction is unambiguous;
-13. the `SeedSequence(7).spawn(2)` + PCG64 rejection-sampled derangement sequence is implementable exactly;
-14. the held-out null limitation is preserved in reporting;
-15. the C5-A Go / No-Go rule is unambiguous;
-16. fixed output artifacts and dtypes are sufficient for reproducibility;
-17. non-empty output directories are safely rejected;
-18. no C5-B or downstream scientific semantics are introduced.
-
-During this re-audit:
+The audit must verify:
 
 ```text
-DO NOT MODIFY CODE
-DO NOT RUN FORMAL C5-A
+1. C5-B scientific question is consistent
+2. C5-A remains closed and unchanged
+3. C5-A formal GO is explicitly validated from artifacts
+4. C5-B inherits authoritative C5-A split materialization
+5. token rows are computational repeated measurements
+6. PCA exact SVD/cutoff/rank semantics are unambiguous
+7. one full TRAIN PCA/SVD is computed per node
+8. 95% and 99% are prefixes of the same PCA basis
+9. ordinary CCA whitening/SVD definition is unambiguous
+10. no ridge/regularization is introduced
+11. held-out has no refit/reorder/abs/sign repair
+12. Top1/Top5Mean/Top10Mean definitions are exact
+13. null refits CCA after TRAIN derangement
+14. PCA is not refit under null
+15. TRAIN/HELD-OUT derangements are independent
+16. all four configurations reuse the same permutation banks
+17. R=200 and seed=17 are consistent across documents
+18. only O2↔P2 99% Top5Mean gates C5-B
+19. representation-stage joint gate is distinct from final overall research gate
+20. output schemas and NPZ keys are exact
+21. no policy/action/transferability conclusion is implied
+22. no upstream artifact or scientific protocol is modified
 ```
 
-If a concrete statistical or artifact incompatibility remains, stop and report it before implementation.
+If any conflict remains:
+
+```text
+STOP
+```
+
+and report exact locations.
+
+Do not resolve a scientific inconsistency by silently choosing an implementation assumption.
 
 ---
 
-## 29. Current Gate
-
-Current state:
+## 41. Current Status
 
 ```text
-C5-D0 Formal Collection              PASS
-C2 OpenVLA Full Feature Extraction   PASS
-C3 π0.5 Full Feature Extraction      PASS
-C4 Formal Paired Feature             PASS
-C5-A Representation Geometry         DRAFT v3 — FINAL READ-ONLY RE-AUDIT REQUIRED
-C5-B Explicit Shared-Space Alignment NOT STARTED
-Final joint C5 gate                   OPEN
+C5-A Representation Geometry:
+FORMAL GO / CLOSED
+
+C5-B Scientific Contract:
+DRAFT v2.1 — FINAL READ-ONLY RE-AUDIT REQUIRED
+
+C5-B Implementation:
+NOT AUTHORIZED
+
+C5-B Formal Execution:
+NOT AUTHORIZED
+
+C5 Representation-Stage Joint Gate:
+FROZEN
+PASS iff C5-A GO AND C5-B PASS
+
+Final Overall Research Gate:
+OPEN / NOT DEFINED HERE
+
+Policy/Action Relevance:
+NOT STARTED
+
+Transferability / Tex3D Optimization:
+NOT STARTED
 ```
-
-After documentation synchronization and a PASS final read-only re-audit:
-
-```text
-C5-A implementation may be separately authorized.
-```
-
-After formal C5-A execution:
-
-```text
-C5-A GO
--> proceed to C5-B explicit shared-space alignment discussion
-
-C5-A NO-GO
--> stop and reassess the shared-representation hypothesis under the frozen C5-A result
-```
-
-No statement about final overall C5 PASS/FAIL is authorized by this contract.
