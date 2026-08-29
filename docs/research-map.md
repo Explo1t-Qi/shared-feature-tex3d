@@ -236,7 +236,10 @@ C5-B scientific contract                   FROZEN
 C5-B implementation                        UNIT-LEVEL PASS
 C5-B formal execution                      FORMAL COMPLETE / PASS
 C5 representation-stage                    FORMAL COMPLETE / PASS
-C6-A policy-sensitivity interface audit     READY / NOT EXECUTED
+C6-A policy-sensitivity interface closure   COMPLETE / FROZEN
+C5-BM authoritative mapping materialization NEXT / NOT STARTED
+C6 intervention-interface implementation   NOT STARTED
+C6-B policy-sensitivity analysis            NOT STARTED
 Final overall research gate                OPEN / NOT DEFINED HERE
 Policy/action relevance                    NOT STARTED
 Transferability / Tex3D optimization       NOT STARTED
@@ -284,9 +287,11 @@ implementation 与 formal execution 也已完成；primary `O2 ↔ P2` 99%-PCA
 HELD-OUT Top5Mean 为 `0.970583518852`，one-sided empirical
 `p = 0.00497512437811`，因此冻结结果为 `C5-B PASS`。由冻结 joint gate 得到
 `C5 representation-stage PASS`。该结果不是最终 overall research PASS；最终
-overall research gate 仍为 `OPEN / NOT DEFINED HERE`。当前 `task.md` 准备
-read-only C6-A policy-sensitivity interface audit，该 audit 尚未执行，也不构成
-policy/action relevance evidence。
+overall research gate 仍为 `OPEN / NOT DEFINED HERE`。C6-A source audit、scientific
+review 与 contract review 已完成，冻结状态为
+`INTERFACE FEASIBLE WITH EXPLICIT PREREQUISITES`。该 interface closure 不构成
+policy/action relevance evidence。下一工程前置阶段是 C5-BM authoritative mapping
+materialization，但其 implementation 与 formal materialization 均尚未授权。
 
 ---
 
@@ -1037,7 +1042,31 @@ O2   ↔ P2 positive
 
 ## 13. Policy / Action Relevance — Next Stage
 
-### OPEN
+### DECISION / FACT — C6-A Interface Closure
+
+C6-A source audit、scientific review 与 final contract review 已完成。冻结状态为：
+
+```text
+INTERFACE FEASIBLE WITH EXPLICIT PREREQUISITES
+```
+
+C6-A 冻结了以下 stage boundary：
+
+- confirmed primary cross-model action object 是 first-step translation only；
+- rotation 仅可在确认 deployed robosuite `OSC_POSE` 语义后条件性加入；
+- gripper 保持 separate analysis；
+- gradient/JVP 可以作为 screening，但不是 policy relevance 的充分证据；
+- controlled directional intervention 是更强的后续验证机制；
+- 历史 C5-B mappings 未被持久化，不能声称精确恢复历史内存矩阵；
+- C6-B 前必须通过显式授权的 re-fit 产生新的、版本化的 authoritative
+  `O2 ↔ P2` 99%-PCA true-TRAIN mapping artifact；
+- real intervention smoke 前必须先完成独立的 O2/P2 intervention-interface
+  coding stage。
+
+上述结论只完成 interface closure，不证明 policy relevance、causal relevance、
+action relevance 或 transferability。
+
+### OPEN — C6-B Policy / Action Relevance
 
 C5 不负责证明：
 
@@ -1055,7 +1084,8 @@ S_{\mathrm{shared}}
 S_{\mathrm{action-relevant}}.
 \]
 
-当前尚未冻结具体 action-relevance 方法。
+当前尚未冻结 C6-B 的最终 sensitivity metric、native intervention vector、token
+scope、perturbation scale、candidate-selection rule 或 statistical threshold。
 
 候选方向包括但不限于：
 
@@ -1064,7 +1094,8 @@ S_{\mathrm{action-relevant}}.
 - intervention；
 - action prediction。
 
-在方法正式讨论和冻结之前，不应提前选定其中任意一种。
+在 C5-BM mapping materialization 和独立 intervention-interface prerequisite
+完成、且 C6-B 方法正式讨论和冻结之前，不应提前选定其中任意一种。
 
 ---
 
@@ -1128,9 +1159,13 @@ C5-B SVCCA — FORMAL COMPLETE / PASS
         ↓
 C5 representation-stage — PASS
         ↓
-C6-A policy-sensitivity interface audit — READY / NOT EXECUTED
+C6-A policy-sensitivity interface closure — COMPLETE / FROZEN
         ↓
-future action-relevance contract and analysis — NOT STARTED
+C5-BM authoritative mapping materialization — NEXT / NOT STARTED
+        ↓
+O2/P2 intervention-interface contract and implementation — NOT STARTED
+        ↓
+C6-B policy-sensitivity contract and analysis — NOT STARTED
         ↓
 shared + action-relevant directions
         ↓
@@ -1147,9 +1182,10 @@ held-out cross-VLA transfer evaluation
 > group-block null criterion？
 
 C5-A 的正式结果为 `GO`，C5-B / SVCCA 的正式结果为 `PASS`，因此冻结的 joint
-gate 得到 `C5 representation-stage PASS`。当前 `task.md` 准备 read-only C6-A
-policy-sensitivity interface audit；该 audit 尚未执行，不是 policy/action relevance
-结论。最终 overall research gate 仍为 `OPEN / NOT DEFINED HERE`。
+gate 得到 `C5 representation-stage PASS`。C6-A interface closure 现已完成并冻结为
+`INTERFACE FEASIBLE WITH EXPLICIT PREREQUISITES`。该结论不是 policy/action
+relevance PASS；C5-BM 是下一工程前置阶段但尚未开始。最终 overall research gate
+仍为 `OPEN / NOT DEFINED HERE`。
 
 如果 C5-A NO-GO，应停止并重新评估当前 frozen geometry hypothesis；不得静默
 更换 C5-A metric、split、null 或 threshold。无论 C5-A 结果如何，都不能将其
@@ -1184,16 +1220,17 @@ task.md
 
 ```text
 1. pilot-v0.2-spec.md        PASS
-2. task.md                   C6-A READ-ONLY AUDIT DRAFT
-3. AGENTS.md                 C5 FORMAL STATUS SYNCHRONIZED
-4. research-map.md           C5 FORMAL STATUS SYNCHRONIZED
+2. task.md                   C6-A INTERFACE CLOSURE FROZEN / PASS
+3. AGENTS.md                 C6-A STATUS SYNCHRONIZED
+4. research-map.md           C6-A STATUS SYNCHRONIZED
 ```
 
 Pilot v0.1 remains historical and unchanged.
 
 `AGENTS.md` distinguishes v0.1 and v0.2 routing and preserves the completed C5-A,
-C5-B, and representation-stage records. The current `task.md` prepares a read-only
-C6-A interface audit; it does not authorize intervention implementation or formal
+C5-B, representation-stage, and C6-A interface-closure records. The current
+`task.md` is the frozen C6-A scientific and engineering authority; it does not
+authorize C5-BM implementation, intervention-interface implementation, or formal
 policy/action experiments.
 
 The C5-D0 collector has reached `UNIT-LEVEL PASS`, its reduced real integration
@@ -1210,11 +1247,13 @@ collection.
 C5-B / SVCCA implementation and formal execution are complete, producing
 `C5-B PASS` and therefore `C5 representation-stage PASS` under the frozen joint
 gate. The final overall research gate remains `OPEN / NOT DEFINED HERE`;
-C6-A is `READY / NOT EXECUTED`, while policy/action relevance and transferability /
-Tex3D optimization remain `NOT STARTED`.
+C6-A interface closure is `COMPLETE / FROZEN`, with status
+`INTERFACE FEASIBLE WITH EXPLICIT PREREQUISITES`. C5-BM is `NEXT / NOT STARTED`,
+while intervention-interface implementation, C6-B policy/action relevance,
+transferability, and Tex3D optimization remain `NOT STARTED`.
 
 ---
 
 ## 17. Current One-Line Research Summary
 
-> Linear CKA and SVCCA support a held-out-generalizing cross-VLA representation space; next audit the policy-sensitivity interfaces before defining how to test action relevance, and do not design a Tex3D shared-feature loss until the later gates are explicitly frozen and passed.
+> Linear CKA and SVCCA support a held-out-generalizing cross-VLA representation space, and C6-A confirms that O2/P2 policy-sensitivity interfaces are implementable with explicit prerequisites; next formally materialize the authoritative C5-B mapping, while policy/action relevance and Tex3D loss design remain not started.

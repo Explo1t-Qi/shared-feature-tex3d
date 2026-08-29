@@ -260,15 +260,43 @@ Formal C5-B execution on the completed 200-record C4 paired dataset is complete:
 This representation-stage result is complete, but it is not a final overall
 research PASS and does not establish policy/action relevance or transferability.
 
+### DECISION / FACT — C6-A Policy-Sensitivity Interface Closure
+
+The current `task.md` is the frozen scientific and engineering authority for the
+completed C6-A interface-closure stage.
+
+The C6-A source audit, scientific review, and final contract review are complete.
+The frozen C6-A status is:
+
+```text
+INTERFACE FEASIBLE WITH EXPLICIT PREREQUISITES
+```
+
+C6-A freezes only the following interface-level conclusions:
+
+- controlled intervention at OpenVLA O2 and π0.5 P2 is technically implementable,
+  although neither model currently exposes a native continuation/replacement API;
+- the confirmed primary cross-model action object is first-step translation only;
+- rotation remains conditional on deployed robosuite `OSC_POSE` semantics, and
+  gripper remains separate;
+- the historical C5-B matrices were not persisted and cannot be claimed as exactly
+  recoverable;
+- a new versioned `O2 ↔ P2` 99%-PCA true-TRAIN mapping artifact must be produced by
+  an explicitly authorized re-fit before C6-B;
+- a separate O2/P2 intervention-interface coding stage is required before a real
+  intervention smoke test.
+
+This closure does not establish policy relevance, causal relevance, action
+relevance, or transferability. C5-B mapping materialization (`C5-BM`) is the next
+engineering prerequisite, but it is `NOT STARTED / NOT AUTHORIZED`. The separate
+intervention-interface implementation and C6-B scientific analysis are also
+`NOT STARTED / NOT AUTHORIZED`.
+
 ### OPEN — Final Overall Research Gate and Later Stages
 
 The final overall research gate remains `OPEN / NOT DEFINED HERE`. A C5
 representation-stage PASS would not establish policy relevance, action relevance,
 adversarial transferability, or attack effectiveness.
-
-The current `task.md` prepares a read-only C6-A policy-sensitivity interface audit.
-That audit is `READY / NOT EXECUTED`; it does not itself establish policy or action
-relevance.
 
 The following scientific stages remain `NOT STARTED`:
 
@@ -276,10 +304,10 @@ The following scientific stages remain `NOT STARTED`:
 - transferability evaluation;
 - Tex3D optimization.
 
-Do not begin C6 intervention implementation, formal policy/action analysis,
-transferability evaluation, or Tex3D optimization without their required explicit
-authorization. Do not infer a final overall research PASS/FAIL from the completed
-representation-stage result.
+Do not begin C5-BM implementation, C6 intervention-interface implementation,
+formal policy/action analysis, transferability evaluation, or Tex3D optimization
+without their required explicit authorization. Do not infer a final overall
+research PASS/FAIL from the completed representation-stage or C6-A interface result.
 
 ---
 
