@@ -5,7 +5,7 @@
 ```text
 C5-BM CONTRACT REVIEW: PASS
 C5-BM scientific / engineering contract: FROZEN
-C5-BM implementation: NOT AUTHORIZED
+C5-BM implementation: AUTHORIZED
 C5-BM formal materialization: NOT AUTHORIZED
 ```
 
@@ -612,7 +612,83 @@ C6-B scientific design must not begin by assuming the mapping artifact exists un
 The final read-only contract audit passed after the output-safety, mathematical
 notation, and document-integrity corrections were applied.
 
-This freezes the C5-BM scientific and engineering contract only. It does not
-authorize implementation or formal materialization. It also does not authorize
-the intervention interface, C6-B policy-sensitivity analysis, native intervention
-vectors, token scope, perturbation scale, or Tex3D loss design.
+This freezes the C5-BM scientific and engineering contract. C5-BM implementation
+is now separately authorized under Section 16, but formal materialization remains
+not authorized. The contract does not authorize the intervention interface, C6-B
+policy-sensitivity analysis, native intervention vectors, token scope,
+perturbation scale, or Tex3D loss design.
+
+---
+
+## 16. Implementation Authorization
+
+### Status boundary
+
+```text
+C5-BM implementation: AUTHORIZED
+C5-BM formal materialization: NOT AUTHORIZED
+C6 intervention-interface implementation: NOT AUTHORIZED
+C6-B policy-sensitivity analysis: NOT AUTHORIZED
+```
+
+This section authorizes implementation and focused synthetic/unit testing of the
+frozen C5-BM contract. It does not authorize formal execution on the frozen
+200-pair dataset or publication of the authoritative mapping artifact.
+
+### Objective and minimum scope
+
+Implement the minimum code and tests required to support later, separately
+authorized materialization of exactly:
+
+```text
+O2 ↔ P2
+99%-PCA
+true, unpermuted TRAIN fit
+```
+
+The implementation must support:
+
+1. loading and validating the frozen formal inputs;
+2. reusing existing C2/C3/C4 validation semantics for all 200 paired archives;
+3. reproducing the frozen primary C5-B PCA and ordinary linear CCA fit;
+4. exposing and persisting PCA means, PCA bases, required whitening/projection
+   transforms, `W_A`, `W_B`, and full `sigma`;
+5. frozen canonical ordering and deterministic sign canonicalization;
+6. historical four-file identity checks and SHA-256 provenance;
+7. frozen portable file and array hashing;
+8. historical scalar validation at absolute tolerance `1e-8`;
+9. transactional publication of exactly `mapping.npz`, `metadata.json`,
+   `validation.json`, and `summary.md`;
+10. staged-output reload/integrity validation and frozen PASS/BLOCKED reporting.
+
+No formal authoritative artifact may be produced during this implementation task.
+
+### Required focused tests
+
+At minimum cover:
+
+- required mapping arrays, full `sigma`, shapes, dtypes, and reproducible hashes;
+- positive and negative sign anchors, smallest-index exact ties, non-finite and
+  all-zero rejection, and paired-only sign flipping;
+- exact-match metadata pass/fail behavior;
+- historical scalar differences at and across the `1e-8` boundary;
+- required historical hashes, post-run immutability checks, and mutation detection;
+- non-empty target rejection, no overwrite, failed-publication safety, and exact
+  four-file successful staged publication.
+
+Use synthetic/unit-level fixtures where possible. Do not run the formal 200-pair
+materialization in the test suite.
+
+### Engineering and stop conditions
+
+Inspect and reuse the current C5-B implementation and existing validators where
+appropriate. Keep the diff small, do not change public interfaces silently, and
+do not refactor unrelated code. Before coding, report the minimum production/test
+files, reused functions, how formal execution is avoided, and any blocker.
+
+Implementation is complete only when focused tests and diff-integrity checks pass,
+historical formal artifacts remain unchanged, no authoritative mapping has been
+published, and no C6 intervention/sensitivity code has been added.
+
+After implementation and tests, stop. Formal C5-BM materialization, intervention
+interfaces, C6-B, and Tex3D optimization each require separate authorization.

@@ -299,9 +299,10 @@ authoritative reusable `O2 ↔ P2`, 99%-PCA, true-TRAIN PCA+CCA mapping. It does
 claim recovery of the historical unsaved in-memory C5-B matrices and does not
 change the historical `C5-B PASS` result.
 
-C5-BM implementation and formal materialization remain `NOT STARTED / NOT
-AUTHORIZED`. The separate intervention-interface implementation and C6-B
-scientific analysis also remain `NOT STARTED / NOT AUTHORIZED`.
+C5-BM implementation is `AUTHORIZED / NOT STARTED` under the current `task.md`.
+Formal C5-BM materialization remains `NOT AUTHORIZED`. The separate
+intervention-interface implementation and C6-B scientific analysis also remain
+`NOT STARTED / NOT AUTHORIZED`.
 
 ### OPEN — Final Overall Research Gate and Later Stages
 
@@ -315,10 +316,11 @@ The following scientific stages remain `NOT STARTED`:
 - transferability evaluation;
 - Tex3D optimization.
 
-Do not begin C5-BM implementation, C6 intervention-interface implementation,
-formal policy/action analysis, transferability evaluation, or Tex3D optimization
-without their required explicit authorization. Do not infer a final overall
-research PASS/FAIL from the completed representation-stage or C6-A interface result.
+Implement C5-BM only under the current authorized contract and stop before formal
+materialization. Do not begin C6 intervention-interface implementation, formal
+policy/action analysis, transferability evaluation, or Tex3D optimization without
+their required explicit authorization. Do not infer a final overall research
+PASS/FAIL from the completed representation-stage or C6-A interface result.
 
 ---
 
