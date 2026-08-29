@@ -233,10 +233,10 @@ Formal C5-A execution on the completed 200-record C4 paired dataset is complete:
 This `GO` authorized proceeding to a separately contracted C5-B discussion only.
 It was not by itself a final C5 PASS.
 
-### DECISION — C5-B and C5 Representation-Stage Joint Gate
+### DECISION / FACT — C5-B and C5 Representation-Stage Joint Gate
 
-The current `task.md` is the frozen scientific and implementation contract for
-C5-B. It freezes:
+The completed C5-B contract remains the frozen scientific authority for C5-B.
+It freezes:
 
 - C5-B null repeats: `200`;
 - C5-B root RNG seed: `17`, using contract-defined independent TRAIN and
@@ -249,8 +249,16 @@ C5-B. It freezes:
   positive and its one-sided empirical `p <= 0.05`;
 - C5 representation-stage PASS iff `C5-A GO AND C5-B PASS`.
 
-The C5-B scientific contract is frozen, but C5-B implementation and formal
-execution are both `NOT AUTHORIZED` until separately approved.
+Formal C5-B execution on the completed 200-record C4 paired dataset is complete:
+
+- primary `O2 ↔ P2`, 99%-PCA, TRAIN-ordered HELD-OUT Top5Mean:
+  `0.970583518852`;
+- one-sided empirical `p = 0.00497512437811`;
+- frozen C5-B result: `PASS`;
+- frozen C5 representation-stage result: `PASS`.
+
+This representation-stage result is complete, but it is not a final overall
+research PASS and does not establish policy/action relevance or transferability.
 
 ### OPEN — Final Overall Research Gate and Later Stages
 
@@ -258,16 +266,20 @@ The final overall research gate remains `OPEN / NOT DEFINED HERE`. A C5
 representation-stage PASS would not establish policy relevance, action relevance,
 adversarial transferability, or attack effectiveness.
 
-The following stages remain `NOT STARTED`:
+The current `task.md` prepares a read-only C6-A policy-sensitivity interface audit.
+That audit is `READY / NOT EXECUTED`; it does not itself establish policy or action
+relevance.
+
+The following scientific stages remain `NOT STARTED`:
 
 - policy/action relevance;
 - transferability evaluation;
 - Tex3D optimization.
 
-Do not begin C5-B implementation, formal C5-B execution, policy/action analysis,
+Do not begin C6 intervention implementation, formal policy/action analysis,
 transferability evaluation, or Tex3D optimization without their required explicit
-authorization. Do not infer a final overall research PASS/FAIL from the frozen
-representation-stage rule.
+authorization. Do not infer a final overall research PASS/FAIL from the completed
+representation-stage result.
 
 ---
 

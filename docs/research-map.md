@@ -233,8 +233,10 @@ C2/C3 — Pilot v0.2 full extraction         COMPLETE
 C4 — Pilot v0.2 formal paired manifest     COMPLETE
 C5-A — Representation Geometry             FORMAL COMPLETE / GO
 C5-B scientific contract                   FROZEN
-C5-B implementation / formal execution     NOT AUTHORIZED
-C5 representation-stage joint gate         FROZEN
+C5-B implementation                        UNIT-LEVEL PASS
+C5-B formal execution                      FORMAL COMPLETE / PASS
+C5 representation-stage                    FORMAL COMPLETE / PASS
+C6-A policy-sensitivity interface audit     READY / NOT EXECUTED
 Final overall research gate                OPEN / NOT DEFINED HERE
 Policy/action relevance                    NOT STARTED
 Transferability / Tex3D optimization       NOT STARTED
@@ -276,12 +278,15 @@ C2/C3 的 2-sample real smoke 只证明：
 pipeline closure
 ```
 
-不能用于正式 C5 scientific conclusion。当前 `task.md` 已冻结 C5-A 方法与
-geometry-stage gate；C5-A 已在正式 C4 paired dataset 上执行完成，TRAIN 与
-HELD-OUT 均通过冻结判据，geometry-stage 结果为 `GO`。该结果只允许进入 C5-B
-discussion，不是最终 overall research PASS。当前 `task.md` 已独立冻结 C5-B
-scientific contract 与 representation-stage joint gate，但 C5-B implementation 和
-formal execution 均未授权；最终 overall research gate 仍为 `OPEN / NOT DEFINED HERE`。
+不能用于正式 C5 scientific conclusion。C5-A 已在正式 C4 paired dataset 上执行
+完成，TRAIN 与 HELD-OUT 均通过冻结判据，geometry-stage 结果为 `GO`。C5-B
+implementation 与 formal execution 也已完成；primary `O2 ↔ P2` 99%-PCA
+HELD-OUT Top5Mean 为 `0.970583518852`，one-sided empirical
+`p = 0.00497512437811`，因此冻结结果为 `C5-B PASS`。由冻结 joint gate 得到
+`C5 representation-stage PASS`。该结果不是最终 overall research PASS；最终
+overall research gate 仍为 `OPEN / NOT DEFINED HERE`。当前 `task.md` 准备
+read-only C6-A policy-sensitivity interface audit，该 audit 尚未执行，也不构成
+policy/action relevance evidence。
 
 ---
 
@@ -441,7 +446,7 @@ C5-A 回答：
 
 > OpenVLA 与 \(\pi_{0.5}\) 是否对同一批 observations 形成相似的 representation geometry？
 
-当前 `task.md` 是 C5-A scientific/statistical contract 的冻结 authority。
+已完成的 C5-A contract 保持为 C5-A scientific/statistical authority。
 
 ### FACT — Formal C5-A Result
 
@@ -465,8 +470,9 @@ C5-A geometry-stage result = GO
 已通过一致性审计。50 次 TRAIN / HELD-OUT 独立 group-block derangements 与冻结
 `SeedSequence(7).spawn(2)`、PCG64 convention 完全一致。
 
-该结果支持继续准备独立 C5-B scientific contract，但不构成最终 C5 PASS，
-也不冻结 C5-B 或 final joint gate 的任何规则。
+该 C5-A 结果本身不构成最终 C5 PASS，也不曾单独冻结 C5-B 或 final joint gate；
+后续独立 C5-B contract 与正式执行已经完成，并形成当前记录的
+`C5 representation-stage PASS`。
 
 ### DECISION — Frozen C5-A Method
 
@@ -561,7 +567,8 @@ C5-A geometry-stage gate 已冻结为：
 C5-A GO iff TRAIN PASS AND HELD-OUT PASS
 ```
 
-该 gate 只决定是否进入 C5-B discussion，不是最终 CKA + SVCCA joint C5 gate。
+该 C5-A gate 单独只决定是否进入 C5-B discussion，不等同于后续已经正式完成的
+C5 representation-stage joint gate。
 
 CKA 用于判断 representation geometry similarity。
 
@@ -576,11 +583,11 @@ CKA 不用于：
 
 ## 10. C5-B — Explicit Shared Linear Alignment
 
-### STATUS — SCIENTIFIC CONTRACT FROZEN / IMPLEMENTATION NOT AUTHORIZED
+### STATUS — FORMAL COMPLETE / PASS
 
-当前 `task.md` 是 C5-B scientific/statistical/implementation contract 的冻结
-authority。C5-B 的方法、RNG、null protocol 与 PASS/FAIL rule 已冻结，但这不授权
-实现或正式执行。
+C5-B 的 scientific/statistical contract、RNG、null protocol 与 PASS/FAIL rule
+保持冻结。Implementation 已通过 unit-level validation，formal execution 已在
+200-record C4 paired dataset 上完成。
 
 ### DECISION — SVCCA-Style PCA/SVD → CCA
 
@@ -695,6 +702,27 @@ Supporting metrics：
 Top1
 Top10Mean
 ```
+
+### FACT — Formal C5-B Result
+
+Primary `O2 ↔ P2`, 99%-PCA formal result：
+
+```text
+TRAIN Top5Mean                 0.977299206880
+HELD-OUT Top5Mean              0.970583518852
+HELD-OUT null median           0.941086355712
+one-sided empirical p          0.00497512437811
+C5-B result                    PASS
+C5 representation-stage       PASS
+```
+
+The minimum attainable empirical p-value under `R = 200` is `1 / 201`, matching
+the observed primary p-value. The 95%-PCA robustness configuration and
+`O1-S ↔ P1` control also completed, but neither determines the frozen C5-B gate.
+
+This result establishes only the completed representation-stage conclusion. It
+does not establish policy/action relevance, causal relevance, transferability, or
+attack effectiveness.
 
 ---
 
@@ -834,10 +862,10 @@ task correspondence
 
 ### DECISION — C5-A and C5-B Null RNG
 
-C5-A 的 50 次 permutation、seed `7` 与 exact RNG convention 已由当前
-`task.md` 冻结。
+C5-A 的 50 次 permutation、seed `7` 与 exact RNG convention 已由完成的
+C5-A contract 冻结。
 
-C5-B 的独立 convention 已由当前 `task.md` 冻结：
+C5-B 的独立 convention 已由完成的 C5-B contract 冻结：
 
 ```text
 R = 200
@@ -902,7 +930,13 @@ iff
 C5-A GO AND C5-B PASS
 ```
 
-该 gate 只总结 representation analysis，不是最终 overall research gate，也不证明
+正式执行已得到 `C5-A GO` 与 `C5-B PASS`，因此冻结的 joint gate 结果为：
+
+```text
+C5 representation-stage PASS
+```
+
+该结果只总结 representation analysis，不是最终 overall research gate，也不证明
 policy relevance、action relevance、adversarial transferability 或 attack effectiveness。
 
 ### OPEN — Final Overall Research Gate
@@ -925,17 +959,9 @@ significantly above shuffled null
 OPEN / NOT DEFINED HERE
 ```
 
-C5-B implementation 与 formal execution 仍需分别明确授权。在授权之前：
-
-```text
-formal C5-B implementation MUST NOT begin
-formal C5-B PASS/FAIL evaluation MUST NOT begin
-final overall C5 PASS/FAIL evaluation MUST NOT begin
-```
-
-这些边界不改变已经完成的 `C5-A GO` 或已经冻结的 representation-stage joint
-rule。以下解释只描述不同 CKA/SVCCA 结果模式的科学含义，不代表最终 overall
-research gate 已冻结。
+C5-B implementation 与 formal execution 均已完成。当前仍禁止从
+`C5 representation-stage PASS` 推导 final overall PASS/FAIL。以下解释只描述不同
+CKA/SVCCA 结果模式的科学含义，不代表最终 overall research gate 已冻结。
 
 ### CKA positive + SVCCA positive
 
@@ -1098,9 +1124,13 @@ group-aware C5 split
         ↓
 C5-A Linear CKA — FORMAL COMPLETE / GO
         ↓
-C5-B SVCCA — CONTRACT FROZEN / IMPLEMENTATION NOT AUTHORIZED
+C5-B SVCCA — FORMAL COMPLETE / PASS
         ↓
-policy/action relevance analysis
+C5 representation-stage — PASS
+        ↓
+C6-A policy-sensitivity interface audit — READY / NOT EXECUTED
+        ↓
+future action-relevance contract and analysis — NOT STARTED
         ↓
 shared + action-relevant directions
         ↓
@@ -1116,9 +1146,10 @@ held-out cross-VLA transfer evaluation
 > `O2 ↔ P2` 是否在 TRAIN 与 HELD-OUT 上都通过冻结的 debiased Linear CKA
 > group-block null criterion？
 
-C5-A 的正式结果为 `GO`。C5-B / SVCCA contract、C5-B RNG/null/PASS rule 与
-C5 representation-stage joint gate 已冻结，但 C5-B implementation 和 formal
-execution 尚未授权。最终 overall research gate 仍为 `OPEN / NOT DEFINED HERE`。
+C5-A 的正式结果为 `GO`，C5-B / SVCCA 的正式结果为 `PASS`，因此冻结的 joint
+gate 得到 `C5 representation-stage PASS`。当前 `task.md` 准备 read-only C6-A
+policy-sensitivity interface audit；该 audit 尚未执行，不是 policy/action relevance
+结论。最终 overall research gate 仍为 `OPEN / NOT DEFINED HERE`。
 
 如果 C5-A NO-GO，应停止并重新评估当前 frozen geometry hypothesis；不得静默
 更换 C5-A metric、split、null 或 threshold。无论 C5-A 结果如何，都不能将其
@@ -1153,37 +1184,37 @@ task.md
 
 ```text
 1. pilot-v0.2-spec.md        PASS
-2. task.md                   C5-B SCIENTIFIC CONTRACT FROZEN
-3. AGENTS.md                 C5-B STATUS SYNCHRONIZED
-4. research-map.md           C5-B STATUS SYNCHRONIZED
+2. task.md                   C6-A READ-ONLY AUDIT DRAFT
+3. AGENTS.md                 C5 FORMAL STATUS SYNCHRONIZED
+4. research-map.md           C5 FORMAL STATUS SYNCHRONIZED
 ```
 
 Pilot v0.1 remains historical and unchanged.
 
-`AGENTS.md` distinguishes v0.1 and v0.2 routing, preserves the completed C5-A
-record, and treats the current `task.md` as the C5-B scientific and implementation
-authority without treating it as implementation or execution authorization.
+`AGENTS.md` distinguishes v0.1 and v0.2 routing and preserves the completed C5-A,
+C5-B, and representation-stage records. The current `task.md` prepares a read-only
+C6-A interface audit; it does not authorize intervention implementation or formal
+policy/action experiments.
 
 The C5-D0 collector has reached `UNIT-LEVEL PASS`, its reduced real integration
 smoke has been audited as `PASS`, and the formal Pilot v0.2 collection has reached
 `COMPLETED + COMPLETE` with 50 accepted groups and 200 canonical observations.
-C2/C3 formal extraction and C4 formal pairing are complete. The current `task.md`
-is the frozen C5-A scientific/statistical contract. Formal C5-A execution is also
-complete: TRAIN and HELD-OUT both passed, producing the frozen geometry-stage
-result `C5-A GO`.
+C2/C3 formal extraction and C4 formal pairing are complete. Formal C5-A execution
+is also complete: TRAIN and HELD-OUT both passed, producing the frozen
+geometry-stage result `C5-A GO`.
 
 The portable OpenVLA checkpoint identity is frozen as
 `openvla/openvla-7b-finetuned-libero-spatial` and was used by the completed formal
 collection.
 
-C5-B / SVCCA scientific contract, RNG, fit-and-evaluate null, PASS/FAIL rule, and
-C5 representation-stage joint gate are frozen. C5-B implementation and formal
-execution remain `NOT AUTHORIZED`. The final overall research gate remains
-`OPEN / NOT DEFINED HERE`; policy/action relevance and transferability / Tex3D
-optimization remain `NOT STARTED`.
+C5-B / SVCCA implementation and formal execution are complete, producing
+`C5-B PASS` and therefore `C5 representation-stage PASS` under the frozen joint
+gate. The final overall research gate remains `OPEN / NOT DEFINED HERE`;
+C6-A is `READY / NOT EXECUTED`, while policy/action relevance and transferability /
+Tex3D optimization remain `NOT STARTED`.
 
 ---
 
 ## 17. Current One-Line Research Summary
 
-> Use Linear CKA to establish where cross-VLA representation geometry is shared, use SVCCA to test whether that similarity admits an explicit held-out-generalizing linear shared space, then identify action-relevant directions inside that space before designing a single-surrogate Tex3D shared-feature loss.
+> Linear CKA and SVCCA support a held-out-generalizing cross-VLA representation space; next audit the policy-sensitivity interfaces before defining how to test action relevance, and do not design a Tex3D shared-feature loss until the later gates are explicitly frozen and passed.
