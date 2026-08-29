@@ -262,8 +262,8 @@ research PASS and does not establish policy/action relevance or transferability.
 
 ### DECISION / FACT — C6-A Policy-Sensitivity Interface Closure
 
-The current `task.md` is the frozen scientific and engineering authority for the
-completed C6-A interface-closure stage.
+The completed C6-A contract remains the frozen scientific and engineering authority
+for the completed C6-A interface-closure stage.
 
 The C6-A source audit, scientific review, and final contract review are complete.
 The frozen C6-A status is:
@@ -287,10 +287,21 @@ C6-A freezes only the following interface-level conclusions:
   intervention smoke test.
 
 This closure does not establish policy relevance, causal relevance, action
-relevance, or transferability. C5-B mapping materialization (`C5-BM`) is the next
-engineering prerequisite, but it is `NOT STARTED / NOT AUTHORIZED`. The separate
-intervention-interface implementation and C6-B scientific analysis are also
-`NOT STARTED / NOT AUTHORIZED`.
+relevance, or transferability.
+
+### DECISION — C5-BM Authoritative Mapping Materialization Contract
+
+The current `task.md` is the frozen scientific and engineering authority for
+C5-BM. Its final read-only contract audit is `PASS`.
+
+C5-BM freezes the minimum authorized future materialization semantics for a new
+authoritative reusable `O2 ↔ P2`, 99%-PCA, true-TRAIN PCA+CCA mapping. It does not
+claim recovery of the historical unsaved in-memory C5-B matrices and does not
+change the historical `C5-B PASS` result.
+
+C5-BM implementation and formal materialization remain `NOT STARTED / NOT
+AUTHORIZED`. The separate intervention-interface implementation and C6-B
+scientific analysis also remain `NOT STARTED / NOT AUTHORIZED`.
 
 ### OPEN — Final Overall Research Gate and Later Stages
 
