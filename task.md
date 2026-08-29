@@ -1,445 +1,629 @@
-You are auditing the repository for the next research stage, C6-A.
+# C6-A Scientific / Engineering Contract
 
-## Context
+## Policy Sensitivity Interface Closure Contract — FROZEN
 
-Project goal:
+**Purpose:** freeze the minimum scientific and engineering conclusions required to close the C6-A interface-feasibility stage and define the explicit prerequisites for C6-B.
 
-Identify cross-VLA shared representations between OpenVLA and π0.5, then determine which shared directions are genuinely policy/action-relevant, and eventually use those directions to design a single-surrogate transferable adversarial texture loss.
+This document does **not** design:
 
-Completed stages:
+- the final C6-B policy-sensitivity metric;
+- the native-space synthesis/intervention vector;
+- token intervention scope;
+- perturbation scale \(\epsilon\);
+- C6-B statistical thresholds;
+- any Tex3D attack loss.
 
-- C5-A: cross-model representation geometry → GO
-- C5-B: explicit shared-space alignment via PCA + ordinary CCA → PASS
-- C5 representation-stage → PASS
+---
 
-Primary aligned representation pair:
+## 1. Stage Context
 
-- OpenVLA O2:
-  multimodal projector output
-  shape `[256, 4096]`
-- π0.5 P2:
-  projected PaliGemma-ready visual representation
-  shape `[256, 2048]`
+C5 established that OpenVLA O2 and π0.5 P2 contain statistically non-random shared representation structure and that a TRAIN-only PCA+CCA shared space exists.
 
-C5-B learned TRAIN-only PCA + CCA mappings that define paired canonical shared directions.
+C6 asks which shared directions are genuinely policy/action-relevant.
 
-We are now entering:
+The current primary representation nodes are:
 
-# C6-A — Policy Sensitivity Interface Audit & Feasibility
+- **OpenVLA O2:** multimodal projector output, shape `[256, 4096]`.
+- **π0.5 P2:** projected PaliGemma-ready visual representation, shape `[256, 2048]`.
 
-C6-A does NOT yet search for action-relevant directions.
+The research logic must preserve the distinction:
 
-Its sole purpose is to determine how to rigorously measure:
+```text
+shared
+≠ policy-relevant
+≠ transferable
+```
 
-> how a change at O2 / P2 affects the downstream VLA action output.
+---
 
-A related paper, “Mechanistic Interpretability for Steering Vision-Language-Action Models”, uses direct FFN activation intervention to establish causal links between internal semantic directions and robot behavior. We may later adopt the same intervention philosophy, but our shared directions come from CCA and are not native FFN neurons.
+## 2. C6-A Read-Only Audit Conclusions
 
-------
+### 2.1 OpenVLA
 
-# Task
+O2 is the live projector output (`projected_patch_embeddings`).
 
-Perform a READ-ONLY code audit.
-
-Do NOT:
-
-- modify any source file;
-- add tests;
-- implement hooks;
-- implement gradients;
-- implement interventions;
-- change documentation;
-- run formal C6 experiments;
-- modify C5 artifacts;
-- propose a final scientific contract yet.
-
-You may run harmless read-only inspection commands, import inspection, shape inspection, or minimal non-mutating code tracing if necessary.
-
-The goal is to answer the questions below from the actual current codebase.
-
-------
-
-# Part A — OpenVLA O2 → Action Path
-
-Trace the exact computation path beginning from the scientific node O2.
-
-Answer:
-
-1. Where exactly is O2 produced?
-   - file
-   - class/function
-   - relevant tensor variable
-   - exact shape/dtype if inferable
-2. After O2 is produced, what exact modules consume it before action prediction?
-
-Provide a concise path such as:
+The downstream deployed path is:
 
 ```text
 O2
-→ ...
-→ ...
-→ action-related logits
-→ token decoding
-→ continuous robot action
+→ multimodal embeddings
+→ language model
+→ autoregressive action-token generation
+→ discrete token decoding
+→ checkpoint action unnormalization
+→ deployed 7D action
+→ gripper post-processing
+→ LIBERO env.step(...)
 ```
 
-Use actual function/class names from the repository.
+The standard deployed path is **not differentiable** from O2 to the final continuous action because it contains:
 
-1. What is the earliest downstream point after O2 from which the model can continue inference if O2 is replaced by a modified tensor?
-
-Determine whether:
-
-- there is an existing continuation-style API;
-- inference must instead be rerun with a hook/replacement at O2;
-- or another intervention point is cleaner.
-
-1. What is OpenVLA's actual action prediction representation?
-
-Identify:
-
-- logits shape;
-- number/type of action tokens;
-- whether autoregressive token generation is used;
-- how tokens are converted to continuous robot actions;
-- final continuous action shape;
-- semantic meaning/order of action dimensions if defined in code/config.
-
-1. Identify all potentially non-differentiable operations between O2 and the final continuous action:
-
-- argmax;
-- token sampling;
+- `generate()` under `no_grad`;
+- greedy `argmax`;
 - discrete token IDs;
-- integer indexing;
-- detach;
-- no_grad;
-- decoding tables;
-- clipping;
-- numpy conversion;
-- other gradient breaks.
+- NumPy-based decoding / bin lookup;
+- gripper binarization.
 
-1. Based strictly on the implementation, distinguish which of these quantities are differentiable with respect to O2:
+However, direct language-model logits and token probabilities are differentiable with respect to O2 when evaluated outside the standard `generate/no_grad` path with a fixed token prefix.
 
-- action logits;
-- action-token probabilities;
-- expected decoded action, if such an object naturally exists;
-- final standard inference continuous action.
+There is no existing public O2 continuation API.
 
-Do NOT redesign the model yet. Just report what is and is not differentiable.
+A future intervention can technically replace the projector output, while a cleaner gradient-preserving implementation would require an explicit continuation interface downstream of O2.
 
-------
+### 2.2 π0.5
 
-# Part B — π0.5 P2 → Action Path
+P2 is the projected visual representation produced by:
 
-Trace the exact computation path beginning from P2.
+```python
+model.PaliGemma.img(...)
+```
 
-Answer:
-
-1. Where exactly is P2 produced?
-   - file
-   - class/function
-   - tensor variable
-   - exact shape/dtype if inferable
-2. Trace the exact downstream computation:
+The downstream policy path is:
 
 ```text
 P2
-→ ...
-→ policy/action generation
-→ action chunk
++ other image streams
++ prompt embeddings
+→ multimodal prefix
+→ prefix KV cache
+→ initial Gaussian action noise
+→ flow-matching velocity prediction
+→ Euler integration
+→ normalized action trajectory
+→ checkpoint quantile unnormalization
+→ LiberoOutputs trimming
+→ deployed LIBERO action chunk
 ```
 
-Use actual code symbols.
+For the current LIBERO configuration:
 
-1. Determine the action-generation mechanism:
+- internal action tensor: `[B, 10, 32]`;
+- deployed LIBERO action chunk: `[10, 7]`;
+- initial Gaussian noise is the principal stochastic input;
+- once noise and all other inputs are fixed, the core computation path is deterministic.
 
-- direct regression?
-- flow matching?
-- iterative denoising?
-- sampling?
-- another mechanism?
+The current dynamic JAX `lax.while_loop` supports forward-mode differentiation / JVP in the audited setup, but not reverse-mode differentiation through the final integrated `x0`.
 
-Describe the actual implementation rather than relying on general π0.5 knowledge.
+The public `Policy.infer()` path converts outputs to NumPy and is therefore outside the JAX gradient graph.
 
-1. Determine:
+There is no existing P2 replacement API.
 
-- output action tensor shape;
-- action horizon/chunk length;
-- action dimension;
-- meaning/order of dimensions;
-- normalization/unnormalization logic;
-- any task-specific action masks.
+A future intervention would require an explicit prefix/continuation path that accepts a modified base-image P2 while preserving:
 
-1. Identify stochastic inputs or iterative states involved in inference:
+- other visual streams;
+- prompt tokens;
+- masks;
+- positions;
+- KV-cache logic.
 
-- sampled noise;
-- random seeds;
-- number of integration/denoising steps;
-- scheduler;
-- other stochasticity.
+---
 
-1. Determine whether a deterministic evaluation path can be obtained by freezing the stochastic inputs without changing the scientific algorithm.
-2. Identify every potential gradient break from final action output back to P2:
+## 3. Scientific Decision 1 — Definition of Policy Sensitivity
 
-- stop_gradient;
-- detach;
-- no_grad;
-- conversion between JAX/NumPy/Python;
-- integer/discrete operations;
-- solver implementation details;
-- explicit non-differentiable code.
+**Decision:** policy sensitivity is **not** defined exclusively by reverse-mode gradients.
 
-1. Determine whether the final continuous action chunk is differentiable with respect to P2 under a fixed-noise/fixed-inference-path setup.
+The core scientific object is the change in policy output caused by a small, controlled perturbation along a representation-space direction \(d\):
 
-Do not implement this. Report feasibility only.
+\[
+h' = h + \epsilon d
+\]
 
-------
+A directional response may later be summarized by a finite directional effect such as:
 
-# Part C — Cross-Model Action Semantics
+\[
+S(d)
+=
+\frac{\|a(h+\epsilon d)-a(h)\|}{\epsilon}
+\]
 
-Compare the two models' final robot action representations.
+This expression is **illustrative only**.
 
-Produce a table with at least:
+C6-A does **not** freeze:
 
-| Property                     | OpenVLA | π0.5 |
-| ---------------------------- | ------- | ---- |
-| action shape                 |         |      |
-| action horizon               |         |      |
-| translation dimensions       |         |      |
-| rotation representation      |         |      |
-| gripper representation       |         |      |
-| normalization                |         |      |
-| clipping                     |         |      |
-| stochasticity                |         |      |
-| differentiability from O2/P2 |         |      |
+- the norm;
+- endpoint;
+- aggregation;
+- normalization;
+- perturbation schedule;
+- candidate-ranking procedure.
 
-Then answer:
+### Evidence hierarchy
 
-1. Do OpenVLA and π0.5 expose semantically compatible physical action quantities?
-2. Which action dimensions are directly comparable?
-3. Which dimensions are not directly comparable without normalization or representation conversion?
-4. Does either model predict action chunks while the other predicts only one step?
-5. Is a common action-level sensitivity metric scientifically feasible?
+1. **Gradient / JVP**
+   Used as a candidate locator or screening signal.
 
-Do NOT choose the final metric yet.
+2. **Small controlled directional intervention**
+   Used to directly measure policy-output change.
 
-------
+3. **Positive/negative interventions across observations and perturbation scales**
+   Used as stronger evidence of policy relevance and causal participation.
 
-# Part D — Intervention Feasibility
+Therefore:
 
-C5-B canonical directions are analysis-space directions, not native model neurons.
+> Gradient availability is useful, but it is not a scientific prerequisite for C6.
 
-For each model determine how a future intervention could technically be implemented.
+A large gradient/JVP is **not**, by itself, sufficient evidence that a direction is policy-relevant.
 
-Conceptually, future C6-B/C6-C may need:
+---
+
+## 4. Scientific Decision 2 — Cross-Model Action Object
+
+### 4.1 Confirmed primary comparison
+
+**Decision:** the confirmed primary cross-model action object is the **first-step translation command only**.
 
 ```text
-original O2/P2
-+ small perturbation corresponding to one CCA-derived direction
-→ continue normal policy forward
-→ compare action output
+Primary confirmed comparison:
+
+OpenVLA:
+a_open[:3]
+
+π0.5:
+A_pi[0, :3]
 ```
 
-Audit:
+where:
 
-1. Can O2/P2 be replaced by a modified tensor in the normal computation graph?
-2. If not directly, what is the cleanest technically valid intervention mechanism?
-   - forward hook;
-   - function argument;
-   - refactored continuation function;
-   - JAX intermediate replacement;
-   - other.
-3. Would such replacement preserve gradients?
-4. Would replacing O2/P2 alter only the chosen scientific representation node, or accidentally bypass/recompute other model components?
-5. Are there architectural complications because O2/P2 are token sequences `[256,D]` rather than one observation-level vector?
-6. Confirm whether the stored C5-B PCA/CCA mapping can in principle be converted back into a direction in the native O2/P2 feature space.
+- `a_open` is the **OpenVLA checkpoint-unnormalized deployed action** after action-token decoding;
+- `A_pi` is the **π0.5 checkpoint quantile-unnormalized action chunk after LiberoOutputs trimming**.
 
-Do not implement the inverse/native direction mapping yet; only verify feasibility.
+The models' internal normalized actions must **not** be directly compared against the other model's deployed/unnormalized actions.
 
-------
+### 4.2 Conditional rotation extension
 
-# Part E — Policy Sensitivity Target Candidates
+Rotation dimensions 4–6 are currently **conditional**, not primary.
 
-Based strictly on the audited code paths, identify the technically valid candidate quantities that C6-A could later use as the downstream "policy output" for sensitivity.
+After the exact deployed `robosuite==1.4.0` `OSC_POSE` rotation-command semantics are confirmed, the comparison may be extended to:
 
-For OpenVLA, list all viable candidates, e.g. if supported by code:
+```text
+Conditional extension:
 
-- action-token logits;
-- probability/logit margin;
-- continuous decoded action surrogate;
-- other.
+OpenVLA:
+a_open[:6]
 
-For π0.5, list all viable candidates:
+π0.5:
+A_pi[0, :6]
+```
 
-- final continuous action;
-- denoising/flow velocity;
-- intermediate action estimate;
-- other.
+Until that controller semantics check is complete, no claim should be made that dimensions 4–6 are strictly identical physical coordinates.
 
-For each candidate report:
+### 4.3 Gripper
 
-- differentiable from O2/P2? YES/NO
-- physically interpretable? HIGH/MEDIUM/LOW
-- faithful to actual deployed action? HIGH/MEDIUM/LOW
-- major caveats
+The gripper dimension is analyzed separately because the deployed conventions differ:
 
-Do NOT decide the scientific primary target yet.
+- OpenVLA is finally binarized;
+- π0.5 may remain continuous;
+- the sign / opening convention differs.
 
-------
+Therefore gripper must not be included in the primary cross-model distance without an explicit later harmonization rule.
 
-# Part F — Determinism and Reproducibility
+### 4.4 π0.5 action horizon
 
-For both models determine what would need to be frozen for a reproducible local sensitivity experiment.
+π0.5 predicts a 10-step action chunk while OpenVLA predicts a single step.
 
-Audit:
+Therefore:
 
-- model eval mode;
-- RNG;
-- action sampling;
-- flow/noise initialization;
-- decoding strategy;
-- dtype;
-- dropout;
-- observation preprocessing;
-- language/task input;
-- robot state/proprio input;
-- action normalization stats.
+- **primary:** π0.5 first action step only;
+- **later robustness / temporal analysis:** π0.5 steps 2–10 or full-chunk response.
 
-State whether repeated identical input can produce bitwise-identical or numerically equivalent action outputs under a controlled setup.
+The full π0.5 action chunk is not currently the primary cross-model action object.
 
-------
+---
 
-# Part G — C5-B Mapping Availability and Provenance Audit
+## 5. Scientific Decision 3 — Authoritative C5-B Mapping Materialization
 
-Audit what C5-B actually persisted.
+### 5.1 Historical limitation
 
-Determine whether the formal C5-B artifacts contain sufficient information to
-reconstruct and reuse the exact TRAIN-fitted PCA + CCA mappings without refitting.
-
-Explicitly check whether the following objects are persisted:
+The formal historical C5-B artifacts did **not** persist:
 
 - PCA TRAIN means;
-- PCA bases / right singular vectors;
-- PCA component ordering;
+- PCA bases;
 - CCA whitening transforms;
-- CCA canonical mappings W_A / W_B;
-- canonical component ordering / signs.
+- CCA mappings \(W_A/W_B\).
 
-If any of these are not persisted, state clearly:
+Therefore it is **not possible to prove** that any newly generated matrices are element-wise identical to the historical in-memory C5-B matrices.
 
-C5-B scientific results remain valid, but the exact fitted canonical mapping is
-not currently materialized as a reusable formal artifact.
+This is especially important because:
 
-Do NOT:
+- SVD / eigendecomposition signs are ambiguous;
+- near-degenerate directions may rotate within a subspace;
+- no historical matrix artifact exists for direct equality comparison.
 
-- silently refit PCA;
-- silently refit CCA;
-- regenerate mappings and treat them as already-frozen artifacts;
-- modify existing formal C5-B outputs;
-- infer missing mapping tensors from summary statistics.
+Therefore the project must **not** claim to “recover the exact historical C5-B mapping.”
 
-Then audit what would be required for a future mapping-materialization step.
+### 5.2 Authorized re-fit and new authoritative artifact
 
-Report:
+**Decision:** before C6-B, the project will perform an explicitly authorized, versioned re-fit using:
 
-1. Which existing frozen C5-B inputs would be required to deterministically
-   regenerate the mappings.
+- the frozen formal paired inputs;
+- the frozen TRAIN / HELD-OUT split;
+- the same C5-B estimator;
+- the same scientific configuration;
+- explicitly recorded numerical conventions.
 
-2. Whether the existing implementation is sufficiently deterministic to
-   reproduce the same mappings, including:
-   - observation ordering;
-   - token ordering;
-   - float64 semantics;
-   - PCA SVD ordering;
-   - covariance eigendecomposition ordering;
-   - CCA SVD ordering;
-   - sign conventions.
+This re-fit will produce a **new authoritative reusable mapping artifact** for all future C6 work.
 
-3. What provenance would need to be stored with a future mapping artifact:
-   - source paired manifest;
-   - C5-B split manifest;
-   - source feature hashes / identities;
-   - PCA cutoff;
-   - node identity;
-   - implementation / repository commit;
-   - array dtype and shapes;
-   - canonical ordering and sign convention.
+The new artifact may be scientifically consistent with historical C5-B, but it must **not** be described as element-wise identical to the unsaved historical in-memory matrices.
 
-4. Whether a future C6 intervention can technically consume such frozen mappings
-   once materialized.
+### 5.3 Required materialization scope
 
-Do not materialize the mappings during this audit.
-
-Conclude one of:
-
-C5-B MAPPING REUSE: DIRECTLY AVAILABLE
-
-or
-
-C5-B MAPPING REUSE: REQUIRES FORMAL MATERIALIZATION
-
-or
-
-C5-B MAPPING REUSE: BLOCKED
-
-------
-
-# Required Final Report
-
-Return a structured audit report with these sections:
-
-1. `Executive Summary`
-2. `OpenVLA O2 → Action`
-3. `π0.5 P2 → Action`
-4. `Cross-Model Action Compatibility`
-5. `Differentiability Audit`
-6. `Intervention Feasibility`
-7. `Candidate Policy Sensitivity Targets`
-8. `Determinism / Reproducibility`
-9. `C5-B Reuse Boundaries`
-10. `Blockers / Risks`
-11. `Recommended Decisions for the Human Scientific Review`
-
-For every important claim, include:
-
-- file path;
-- function/class name;
-- relevant line range or code symbol where possible.
-
-At the end give one of:
+The minimum required materialization is:
 
 ```text
-C6-A INTERFACE FEASIBILITY: CLEAR
+node pair:
+O2 ↔ P2
+
+PCA:
+99% explained variance
+
+fit:
+true, unpermuted TRAIN pairing
 ```
 
-or
+This is the primary C5-B configuration and becomes the authoritative mapping reference for the C6 mainline.
+
+### 5.4 Intentionally excluded from required materialization
+
+The following mappings are **not required** for the C6 mainline materialization step:
 
 ```text
-C6-A INTERFACE FEASIBILITY: BLOCKED
+O2 ↔ P2 @95% PCA robustness fit
+O1-S ↔ P1 @99% PCA control fit
+O1-S ↔ P1 @95% PCA control/robustness fit
+all null / permuted mappings
 ```
 
-or
+These configurations remain valid parts of the C5 scientific evidence, but they are intentionally excluded from the minimum C6 intervention-reference artifact.
+
+If future work requires them, they must be materialized explicitly under a separate declared scope.
+
+### 5.5 Required consistency validation
+
+The re-materialized mapping must be validated against the **quantities that were actually persisted** in the existing formal C5-B result.
+
+At minimum, verify consistency of:
+
+- retained PCA dimensions;
+- PCA explained-variance metadata / cutoff behavior;
+- historical TRAIN scalar summaries that can be recomputed from the new fit, including TRAIN Top5Mean;
+- historical HELD-OUT Top1 / Top5Mean / Top10Mean;
+- other persisted formal scalar metrics required to establish that the re-fit reproduces the intended C5-B scientific configuration.
+
+For the newly fitted canonical-correlation vector:
+
+\[
+\sigma = [\sigma_1,\ldots,\sigma_K],
+\]
+
+the full vector must be saved in the new mapping artifact, but it must **not** be described as element-wise validated against the historical C5-B run because the historical full `sigma` vector was not persisted.
+
+Where applicable:
+
+\[
+\text{TRAIN Top5Mean}
+=
+\frac{1}{5}\sum_{k=1}^{5}\sigma_k
+\]
+
+from the new fit should match the historical persisted TRAIN Top5Mean within the frozen numerical tolerance.
+
+Likewise, HELD-OUT Top1 / Top5Mean / Top10Mean recomputed from the new mappings must match the corresponding historical persisted metrics within the frozen tolerance.
+
+Validation must use explicitly frozen numerical tolerances.
+
+This validation establishes **pipeline/scientific consistency**, not equality with the unsaved historical matrices or unsaved historical `sigma` vector.
+
+### 5.6 Required frozen mapping contents
+
+The new authoritative mapping artifact must persist at least:
+
+- PCA TRAIN means for both models;
+- PCA bases;
+- retained PCA dimensions;
+- PCA cutoff;
+- any CCA whitening transforms required by the implementation;
+- CCA mappings \(W_A\) and \(W_B\);
+- canonical correlations `sigma`;
+- `sigma` shape and dtype;
+- canonical component ordering;
+- explicit guarantee that `W_A[:, k]`, `W_B[:, k]`, and `sigma[k]` share the same canonical-component order;
+- explicit sign canonicalization;
+- node identity;
+- array shapes;
+- array dtypes;
+- source paired-manifest identity/hash;
+- TRAIN/HELD-OUT split identity/hash;
+- relevant source-feature identities/hashes;
+- repository/code commit;
+- Python version;
+- NumPy version;
+- BLAS/LAPACK implementation/version where available;
+- platform information;
+- array-content hashes, including a content hash for `sigma`.
+
+### 5.7 Sign canonicalization
+
+Because CCA direction sign is mathematically ambiguous, the new authoritative artifact must impose and record a deterministic sign convention.
+
+This is required so that future statements such as:
 
 ```text
-C6-A INTERFACE FEASIBILITY: PARTIAL
++d_k
+-d_k
 ```
 
-This status is only an engineering/interface audit result.
+have stable meanings across reloads and future experiments.
 
-It must NOT be interpreted as:
+The sign convention belongs to **mapping materialization/provenance**.
 
-- policy-relevance established;
-- causal relevance established;
-- transferability established;
-- C6-A scientific PASS.
+It does **not** define the native-space intervention vector.
 
-If PARTIAL or BLOCKED, state exactly which model/path causes the issue.
+### 5.8 Old artifacts remain immutable
 
-Finally include:
+The materialization step must:
+
+- leave the four existing formal C5-B artifacts unchanged;
+- create a separate, versioned mapping artifact;
+- explicitly record that a new authorized re-fit was performed.
+
+It must not silently rewrite historical C5-B outputs.
+
+---
+
+## 6. Deferred Scientific Decisions
+
+The following items remain intentionally **deferred** and must not be silently decided during mapping materialization or interface implementation:
+
+- the final C6-B policy-sensitivity metric;
+- the exact native-space intervention/synthesis vector corresponding to a canonical coordinate;
+- whether that vector is a projection normal, dual vector, pseudoinverse/minimum-norm solution, or another mathematically justified construction;
+- whether all 256 tokens are perturbed;
+- whether only selected tokens are perturbed;
+- whether spatial weighting is used;
+- per-token perturbation amplitude;
+- perturbation norm;
+- the final \(\epsilon\) schedule;
+- C6-B candidate-count / statistical thresholds;
+- any Tex3D attack loss.
+
+In particular, if:
+
+\[
+z=(x-\mu)V
+\]
+
+and:
+
+\[
+h=zW,
+\]
+
+then \(VW\) describes the linear readout/projection geometry of a canonical coordinate.
+
+It must **not automatically be treated as the unique native-space synthesis/intervention direction**.
+
+That mathematical choice belongs to C6-B scientific design.
+
+---
+
+## 7. Intervention Interface Requirement
+
+The read-only audit established that neither model currently exposes a native continuation/replacement API at the scientific representation node:
 
 ```text
-Files modified: NONE
-Formal experiments executed: NONE
-Implementation performed: NONE
+OpenVLA:
+no public O2 continuation API
+
+π0.5:
+no public P2 replacement API
 ```
 
-Stop after the audit. Do not patch anything without explicit authorization.
+Therefore a real intervention smoke test cannot occur until an explicit engineering interface is implemented.
+
+### 7.1 Required separate interface-coding stage
+
+After mapping materialization, the project must create a **separate intervention-interface coding contract**.
+
+That coding contract may authorize implementation of:
+
+- an OpenVLA O2 replacement / continuation interface;
+- a π0.5 P2 replacement / prefix-continuation interface;
+- minimal validation utilities required to verify tensor replacement and downstream continuation.
+
+### 7.2 What the interface contract must not decide
+
+The interface-coding stage must be explicitly **O2/P2 node-specific**, while remaining **direction- and metric-agnostic**.
+
+It must **not** decide:
+
+- which canonical direction to inject;
+- the native intervention vector;
+- token scope;
+- \(\epsilon\);
+- sensitivity metric;
+- candidate selection;
+- C6-B thresholds;
+- Tex3D loss.
+
+The engineering interface should be capable of accepting a controlled replacement/perturbation tensor without embedding a scientific intervention policy into the API.
+
+### 7.3 Validation order
+
+Interface validation should proceed as:
+
+```text
+implementation
+→ static/unit-level correctness checks where feasible
+→ independent code review
+→ real-device / accelerator smoke validation
+```
+
+No CPU-only requirement is imposed.
+
+The real smoke must confirm that:
+
+- the intended O2/P2 node is replaced;
+- other upstream components are not accidentally recomputed or bypassed in an invalid way;
+- normal downstream policy computation continues;
+- output shapes and action semantics remain valid;
+- fixed-noise π0.5 evaluation is reproducible under the declared setup.
+
+---
+
+## 8. C6-A Closure Criteria
+
+C6-A can be considered scientifically closed once the following statements are accepted:
+
+1. Controlled representation-space intervention is technically feasible for both O2 and P2, although neither model currently exposes a native continuation API.
+2. A fully differentiable deployed-action path is not required for the scientific definition of policy sensitivity.
+3. Gradient/JVP may be used for screening, while controlled directional intervention provides stronger evidence of policy relevance.
+4. The confirmed primary cross-model action object is first-step **translation** only.
+5. Rotation dimensions may be added only after the deployed robosuite `OSC_POSE` rotation-command semantics are confirmed.
+6. Gripper remains a separate analysis dimension.
+7. Historical C5-B mappings cannot be claimed as exactly recoverable because they were not persisted.
+8. A new, versioned, authoritative O2↔P2 99%-PCA true-TRAIN mapping artifact must be produced by an explicitly authorized re-fit before C6-B.
+9. The new mapping must use deterministic sign canonicalization and formal provenance.
+10. A separate O2/P2 intervention-interface implementation stage is required before real intervention smoke testing.
+11. Native synthesis direction, token scope, \(\epsilon\), and final sensitivity metric remain deferred to C6-B.
+
+**Frozen C6-A status:**
+
+```text
+INTERFACE FEASIBLE WITH EXPLICIT PREREQUISITES
+```
+
+This status does **not** imply:
+
+```text
+policy relevance PASS
+causal relevance PASS
+transferability PASS
+```
+
+---
+
+## 9. Post-C6-A Workflow
+
+After this contract receives final read-only approval:
+
+```text
+1. C6-A contract freeze
+        ↓
+2. update research-status documentation
+        ↓
+3. C5-BM — Authoritative Mapping Materialization Contract
+        ↓
+4. mapping implementation
+        ↓
+5. formal mapping materialization + consistency validation
+        ↓
+6. independent mapping review
+        ↓
+7. separate Intervention Interface Coding Contract
+        ↓
+8. O2/P2 interface implementation
+        ↓
+9. static/unit-level validation where feasible
+        ↓
+10. independent interface code review
+        ↓
+11. real-device intervention-interface smoke
+        ↓
+12. C6-B scientific contract design
+```
+
+The mapping-materialization stage and intervention-interface stage are conceptually distinct engineering prerequisites.
+
+Their serial ordering here is a project workflow choice, not a claim that the interface architecture mathematically depends on the materialized CCA mappings.
+
+---
+
+## 10. Documentation Update After Final PASS
+
+After final C6-A contract approval and freeze:
+
+- update `AGENTS.md`;
+- update `docs/research-map.md`;
+
+to record C6-A as completed at the **interface-closure** level.
+
+Do not describe C6-A as establishing policy/action relevance.
+
+`docs/pilot-v0.2-spec.md` does not require modification for this closure.
+
+---
+
+## 10.1 Freeze Hygiene Record
+
+Repository-level freeze hygiene has been verified with `git diff --check`.
+
+This is a formatting / repository-hygiene requirement only and does not change the scientific contract.
+
+## 11. Final Read-Only Review Record
+
+The final read-only review was completed against:
+
+- the completed C6-A audit;
+- the current `shared-feature-tex3d` source;
+- the audited local OpenVLA source;
+- the audited local OpenPI source;
+- the audited Tex3D rollout/action wrappers;
+- LIBERO and the currently available controller evidence.
+
+The review confirmed that:
+
+1. the primary action comparison is now internally consistent;
+2. the definitions of `a_open` and `A_pi` correctly refer to deployed, checkpoint-unnormalized action quantities;
+3. the contract no longer claims recovery of exact historical C5-B matrices;
+4. the authorized re-fit / new authoritative mapping distinction is scientifically and technically correct;
+5. the minimum mapping scope
+   `O2 ↔ P2 / 99%-PCA / true unpermuted TRAIN fit`
+   is sufficient for the current C6 mainline;
+6. the intentionally excluded mapping configurations are safe to leave outside the required artifact;
+7. the required consistency-validation checks compare only historically persisted quantities and do not claim element-wise validation of the unsaved historical `sigma` vector;
+8. the new authoritative mapping artifact correctly persists full `sigma`, its ordering, dtype/shape, and content hash;
+9. sign canonicalization is correctly treated as a mapping/provenance issue rather than a native intervention-vector decision;
+10. the workflow contains the intervention-interface implementation stage before smoke testing;
+11. the interface coding stage is correctly O2/P2 node-specific while remaining direction- and metric-agnostic;
+12. no remaining prerequisite blocks C6-A interface closure.
+
+### Verdict
+
+```text
+C6-A CONTRACT REVIEW: PASS
+```
+
+This review did not:
+
+- redesign C6-B;
+- choose a final policy-sensitivity metric;
+- define the native intervention vector;
+- choose token scope;
+- choose \(\epsilon\);
+- implement mapping materialization;
+- implement intervention interfaces;
+- design the Tex3D attack loss.
+
+---
+
+*Frozen after the C6-A source audit, contract reviews, and human scientific review.*
