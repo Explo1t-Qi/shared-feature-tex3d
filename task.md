@@ -5,12 +5,14 @@
 ```text
 C5-BM formal materialization: FORMAL COMPLETE / PASS
 C6 intervention-interface contract: FINAL READ-ONLY AUDIT PASS / FROZEN
-C6 interface implementation: NOT AUTHORIZED
-C6 unit validation: NOT AUTHORIZED
-C6 real clean-equivalence / intervention smoke: NOT AUTHORIZED
+C6 interface implementation: UNIT-LEVEL PASS
+C6 unit validation: PASS
+C6 real clean-equivalence / intervention smoke: NEXT / NOT AUTHORIZED
 C6-B policy-sensitivity analysis: NOT AUTHORIZED
 Tex3D optimization: NOT AUTHORIZED
 ```
+
+The completed unit-level validation does not establish real-checkpoint integration.
 
 This contract defines the minimum implementation boundary for explicit continuation interfaces at OpenVLA O2 and π0.5 P2.
 
@@ -528,15 +530,16 @@ no C6-B code added
 
 # 10. Implementation Completion Gate
 
-After final read-only audit of this revised contract, a separate authorization may advance the stage to:
+Following the separate implementation authorization and completed unit-level
+validation, the current stage is:
 
 ```text
-C6 interface implementation: AUTHORIZED
-C6 unit validation: AUTHORIZED
-C6 real clean-equivalence / intervention smoke: NOT AUTHORIZED
+C6 interface implementation: UNIT-LEVEL PASS
+C6 unit validation: PASS
+C6 real clean-equivalence / intervention smoke: NEXT / NOT AUTHORIZED
 ```
 
-Implementation reaches `UNIT-LEVEL PASS` only if:
+Implementation reached `UNIT-LEVEL PASS` because:
 
 ```text
 OpenVLA explicit continuation API implemented

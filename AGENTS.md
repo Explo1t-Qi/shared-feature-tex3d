@@ -307,9 +307,10 @@ all nine mapping-array hashes verified, and all frozen historical scalar checks
 were reproduced with absolute difference `0.0`.
 
 The O2/P2 intervention-interface contract has passed final read-only audit and is
-`FROZEN`. Its implementation and unit validation remain `NOT STARTED / NOT
-AUTHORIZED` pending separate authorization. Real clean-equivalence/intervention
-smoke and C6-B scientific analysis also remain `NOT STARTED / NOT AUTHORIZED`.
+`FROZEN`. Its implementation is `UNIT-LEVEL PASS`, and unit validation is `PASS`.
+These unit-level results do not establish real-checkpoint integration. The C6 real
+clean-equivalence/intervention smoke is the next stage but remains `NOT AUTHORIZED`;
+C6-B scientific analysis also remains `NOT AUTHORIZED`.
 
 ### OPEN — Final Overall Research Gate and Later Stages
 
@@ -324,11 +325,12 @@ The following scientific stages remain `NOT STARTED`:
 - Tex3D optimization.
 
 Do not rerun or overwrite the completed formal C5-BM materialization without a new
-explicit contract. Do not begin C6 intervention-interface implementation, formal
-policy/action analysis, transferability evaluation, or Tex3D optimization without
-their required explicit authorization. Do not infer a final overall research
-PASS/FAIL from the completed representation-stage, C6-A interface result, or
-C5-BM PASS.
+explicit contract. Do not begin real C6 clean-equivalence/intervention smoke,
+formal policy/action analysis, transferability evaluation, or Tex3D optimization
+without their required explicit authorization. The next required contract is the
+separate C6 real clean-equivalence/intervention-smoke contract. Do not infer a final
+overall research PASS/FAIL from the completed representation-stage, C6-A interface
+result, or C5-BM PASS.
 
 ---
 
