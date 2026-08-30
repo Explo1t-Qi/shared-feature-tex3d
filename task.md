@@ -1,582 +1,773 @@
-# C6 — O2/P2 Intervention-Interface Implementation Contract
+# C6 Real Clean-Equivalence / Intervention-Smoke Runner Contract
 
-## Contract Status
+## 1. Current Status
 
 ```text
-C5-BM formal materialization: FORMAL COMPLETE / PASS
-C6 intervention-interface contract: FINAL READ-ONLY AUDIT PASS / FROZEN
+C6 intervention-interface contract: FROZEN
 C6 interface implementation: UNIT-LEVEL PASS
 C6 unit validation: PASS
-C6 real clean-equivalence / intervention smoke: NEXT / NOT AUTHORIZED
+
+C6 real-smoke protocol: REVISED / PENDING FINAL READ-ONLY AUDIT
+C6 real-smoke runner implementation: AUTHORIZED
+C6 real-smoke runner unit validation: AUTHORIZED
+C6 real checkpoint execution: NOT AUTHORIZED
+
 C6-B policy-sensitivity analysis: NOT AUTHORIZED
 Tex3D optimization: NOT AUTHORIZED
 ```
 
-The completed unit-level validation does not establish real-checkpoint integration.
-
-This contract defines the minimum implementation boundary for explicit continuation interfaces at OpenVLA O2 and π0.5 P2.
-
-The interface consumes native model features. It does **not** consume CCA-space features and does not define CCA-to-native intervention directions.
-
----
-
-## 1. Stage Objective
-
-Implement explicit, non-hook continuation paths that allow controlled replacement of:
+本阶段只授权：
 
 ```text
-OpenVLA O2:            [1, 256, 4096]
-π0.5 base-camera P2:   [1, 256, 2048]
+1. 实现真实 smoke runner
+2. 实现结果汇总工具
+3. CPU-only / static / mock-based runner tests
+4. 做 runner code audit
 ```
 
-while holding all non-intervened policy context fixed.
+本阶段**不授权真实模型推理**。
 
-This stage establishes an experimental instrument only. It does not establish policy/action relevance.
+------
 
----
+# 2. Execution Architecture
 
-## 2. Explicitly Deferred Scientific Questions
+由于 OpenVLA 与 π0.5 当前依赖不同运行环境，本 smoke 不要求合并环境。
 
-Do not implement or decide:
+冻结为三个独立入口：
 
 ```text
-CCA component selection
-CCA/shared-space → native-space perturbation construction
-shared-direction ranking
-epsilon selection for scientific analysis
-gradient/JVP policy-sensitivity screening
-C6-B sensitivity metrics
-policy/action relevance claims
-Tex3D losses
-adversarial texture optimization
+OpenVLA real-smoke runner
+π0.5 real-smoke runner
+result aggregator
 ```
 
-C6-B requires a separate scientific contract.
-
----
-
-# 3. OpenVLA Interface
-
-## 3.1 Frozen Runtime Boundary
-
-The authoritative OpenVLA continuation path must use the same deployed inference semantics as the existing LIBERO/OpenVLA path.
-
-Freeze:
+建议文件：
 
 ```text
-batch size: B == 1
-checkpoint/model identity: openvla/openvla-7b-finetuned-libero-spatial
-unnorm_key: libero_spatial_no_noops
-do_sample: False
-center_crop: True
-image preprocessing: reuse the existing C1/OpenVLA LIBERO preprocessing path
-prompt construction: reuse the existing deployed C1/OpenVLA prompt path
-gripper postprocessing: identical to the existing deployed path
+scripts/c6_openvla_real_smoke.py
+scripts/c6_pi05_real_smoke.py
+scripts/c6_real_smoke_summary.py
 ```
 
-Do not create an alternative image preprocessing or prompt formatting path for the intervention interface.
+必要时可增加少量 repository-local helper 或 tests。
 
-The authoritative interface must not modify `../openvla`.
+禁止为了统一运行环境修改：
 
-## 3.2 Preparation API
-
-Implement an explicit preparation function equivalent in responsibility to:
-
-```python
-prepared = prepare_openvla_context(
-    *,
-    model,
-    processor,
-    observation,
-    task_description,
-    pretrained_checkpoint="openvla/openvla-7b-finetuned-libero-spatial",
-    unnorm_key="libero_spatial_no_noops",
-    center_crop=True,
-)
+```text
+../openvla/**
+../openpi/**
 ```
 
-`observation` is the C1 policy observation passed to the deployed OpenVLA `get_action()` path, not the raw MuJoCo observation. In the current C1 semantics it contains the policy-facing image/state fields, while `task_description` is supplied separately.
+------
 
-`pretrained_checkpoint` is explicit for prompt-branch compatibility and provenance, but this contract freezes its authoritative value to:
+# 3. Frozen Observations
+
+使用以下两个固定 Pilot v0.2 observations：
+
+```text
+libero_spatial__task00__state00__step0008
+libero_spatial__task01__state00__step0011
+```
+
+对应正式 observation 文件：
+
+```text
+/data/xiaomengqi/src/shared-feature-tex3d/experiment_inbox/
+c5_d0_pilot_v02_full_collection/observations/
+libero_spatial__task00__state00__step0008.npz
+
+/data/xiaomengqi/src/shared-feature-tex3d/experiment_inbox/
+c5_d0_pilot_v02_full_collection/observations/
+libero_spatial__task01__state00__step0011.npz
+```
+
+原始 observation manifest：
+
+```text
+/data/xiaomengqi/src/shared-feature-tex3d/experiment_inbox/
+c5_d0_pilot_v02_full_collection/collection_manifest.json
+```
+
+对应冻结 image identity：
+
+```text
+task00:
+sha256:279786daa449ca71c3e6aa2c8d6941c37814a9286d2dd2fefd53c3123390b879
+
+task01:
+sha256:b8c55f535389ba9e7ff7a1e106ed2dea696282b62b4202694857372c634f4f4a
+```
+
+runner 必须在执行前验证 observation identity。
+
+禁止因为 smoke 结果不理想而替换 observation。
+
+------
+
+# 4. Model Identity
+
+## 4.1 OpenVLA
+
+Scientific identity：
 
 ```text
 openvla/openvla-7b-finetuned-libero-spatial
 ```
 
-Changing it is outside this contract.
-
-The preparation function must reuse existing preprocessing/prompt behavior and produce an immutable or caller-read-only prepared object containing at least:
+服务器 checkpoint：
 
 ```text
-o2
-  shape: [1, 256, 4096]
-  node: projector output inserted after BOS and before text tokens
-
-all fixed downstream context required to reconstruct the same multimodal sequence and decoding configuration
-
-checkpoint/model identity
-processor/preprocessing identity or configuration
-unnorm_key
+/data/huangsimin/openvla-7b-finetuned-libero-spatial
 ```
 
-The exact Python class name may follow the repository style, but its fields and semantics must be explicit and tested.
-
-## 3.3 Continuation API
-
-Implement an explicit continuation function equivalent in responsibility to:
-
-```python
-result = continue_openvla_from_o2(
-    *,
-    prepared,
-    o2,
-)
-```
-
-Input contract:
+冻结：
 
 ```text
-o2 shape: [1, 256, 4096]
-finite values required
-dtype/device must be compatible with the downstream OpenVLA model
+B = 1
+unnorm_key = libero_spatial_no_noops
+center_crop = True
+do_sample = False
 ```
 
-Allowed handling:
+runner 必须显式记录：
 
 ```text
-shape validation
-finite-value validation
-required dtype conversion
-required device placement
+scientific checkpoint identity
+resolved checkpoint path
+git commit
+runtime/library versions
 ```
 
-Forbidden semantic handling:
+不能只依赖 `PreparedOpenVLAContext` 中记录的字符串判断真实 checkpoint 来源。
+
+------
+
+## 4.2 π0.5
+
+Scientific identity：
 
 ```text
-normalization
-clipping
-reprojection
-automatic rescaling
-CCA-specific processing
+config:
+pi05_libero
+
+checkpoint:
+gs://openpi-assets/checkpoints/pi05_libero
+
+backend:
+JAX / NNX
 ```
 
-The supplied O2 must be the representation actually consumed by the downstream multimodal language-model path.
-
-Forward hooks may be used only for debugging and are not an authoritative intervention mechanism.
-
-## 3.4 OpenVLA Result Semantics
-
-Expose one result object with unambiguous fields:
+服务器 resolved checkpoint：
 
 ```text
-action_token_ids
-  shape: [1, 7]
-  public type: CPU NumPy integer array
-  generated action token IDs
-
-normalized_action
-  shape: [1, 7]
-  public type: CPU NumPy floating array
-  action-token bin-center values before checkpoint-stat unnormalization
-
-unnormalized_action
-  shape: [1, 7]
-  public type: CPU NumPy floating array
-  checkpoint q01/q99 unnormalized continuous action
-
-deployed_action
-  shape: [1, 7]
-  public type: CPU NumPy floating array
-  unnormalized action followed by the existing deployed gripper processing:
-    normalize_gripper_action(..., binarize=True)
-    invert_gripper_action()
+/data/xiaomengqi/checkpoints/pi05_libero/
+openpi-assets/checkpoints/pi05_libero
 ```
 
-For dimensions 1–3, primary cross-model comparison uses the checkpoint-unnormalized translation:
-
-```python
-result.unnormalized_action[:, :3]
-```
-
-Do not retain an ambiguous public definition such as “deployed action or equivalent unnormalized translation”.
-
----
-
-# 4. π0.5 Interface
-
-## 4.1 Frozen Runtime Boundary
-
-This contract supports only the already audited LIBERO π0.5 deployment:
+冻结：
 
 ```text
-config: pi05_libero
-checkpoint: gs://openpi-assets/checkpoints/pi05_libero
-backend: JAX / NNX
-batch size: B == 1
+B = 1
+P2 = [1,256,2048]
+noise = [1,10,32]
 ```
 
-A PyTorch backend is out of scope for this contract.
+runner 必须显式记录并检查：
 
-The authoritative interface must not modify `../openpi`.
+```text
+config identity
+scientific checkpoint identity
+resolved checkpoint path
+backend
+git commit
+JAX/runtime versions
+```
 
-## 4.2 Observation Boundary
+------
 
-The public preparation API accepts the single **unbatched raw LIBERO inference dict** used by the existing `pi05_libero` `Policy.infer()` path.
+# 5. Runner Input Reconstruction
 
-The authoritative preparation order is:
+runner 必须从正式 `PilotObservation` NPZ 和 collection manifest 重建对应模型的真实 policy input。
+
+不得使用 C4 feature archive 代替原始 observation。
+
+## OpenVLA
+
+必须复用冻结的 C1/OpenVLA policy-input semantics。
+
+## π0.5
+
+必须使用已经验证的 LIBERO client-side preprocessing 构造原始 `Policy.infer()` inference dict。
+
+之后由 intervention API 执行：
 
 ```text
 policy input transforms
 → Observation.from_dict
-→ preprocess_observation(None, observation, train=False)
+→ preprocess_observation(..., train=False)
 → image encoder
 ```
 
-This stage freezes `B == 1`; batching multiple raw inference dicts is out of scope.
+禁止 runner 自行创造新的 preprocessing semantics。
 
-Do not define the intervention API around `PilotObservation` or around an already partially transformed observation as the public authoritative input.
+------
 
-## 4.3 Preparation API
+# 6. π0.5 Fixed Noise RNG
 
-Implement an explicit preparation function equivalent in responsibility to:
+冻结 RNG implementation：
+
+```python
+rng = np.random.Generator(
+    np.random.PCG64(2026)
+)
+```
+
+生成：
+
+```text
+distribution:
+standard normal N(0,1)
+
+shape:
+[1,10,32]
+
+generation dtype:
+float32
+```
+
+生成一次后同时供：
+
+```text
+reference
+clean continuation
+modified continuation
+```
+
+使用。
+
+禁止：
+
+```text
+implicit resampling
+reference 和 continuation 分别采样
+根据结果重新生成 noise
+```
+
+------
+
+# 7. Intervention Direction RNG
+
+为避免依赖程序调用顺序，每个 `(model, observation)` 使用独立固定 seed。
+
+冻结：
+
+```text
+OpenVLA task00: 202700
+OpenVLA task01: 202701
+
+π0.5 task00:   202710
+π0.5 task01:   202711
+```
+
+每个 direction 使用：
+
+```python
+rng = np.random.Generator(
+    np.random.PCG64(seed)
+)
+
+direction = rng.standard_normal(
+    feature.shape,
+    dtype=np.float32,
+)
+```
+
+然后对整个单样本 tensor 做全局 L2 normalization：
+
+```python
+direction /= np.linalg.norm(direction)
+```
+
+不得依赖共享 RNG 连续 draw 的调用顺序决定 direction identity。
+
+------
+
+# 8. Synthetic Perturbation
+
+本阶段不使用 CCA direction。
+
+冻结 engineering perturbation：
+
+```text
+alpha = 1e-3
+```
+
+定义：
+
+```python
+intended_delta =
+    alpha * ||clean_feature||_2 * direction
+
+intended_modified =
+    clean_feature + intended_delta
+```
+
+这是 smoke-only engineering scale，不是 C6-B scientific epsilon。
+
+------
+
+# 9. Native-Dtype Applied Perturbation
+
+如果 intervention API 将 override 转换为模型 native dtype/device，例如 BF16，则：
+
+```text
+真正用于 smoke 指标和 PASS 判断的 perturbation
+必须基于模型实际消费后的 feature。
+```
+
+定义：
+
+```text
+actual_modified =
+    actual feature consumed by continuation
+
+actual_delta =
+    actual_modified - clean_native_feature
+```
+
+必须记录：
+
+```text
+||clean_native_feature||
+||intended_delta||
+||actual_delta||
+
+intended relative perturbation
+actual relative perturbation
+```
+
+其中 PASS/smoke metric 使用：
+
+```text
+actual_delta
+```
+
+而不是仅使用转换前 float32 `intended_delta`。
+
+不得原地修改 prepared clean feature。
+
+------
+
+# 10. Correct API Call Order
+
+## OpenVLA
+
+正确调用顺序：
+
+```python
+prepared = prepare_openvla_context(...)
+
+reference = run_openvla_reference(
+    prepared=prepared,
+)
+
+continued = continue_openvla_from_o2(
+    prepared=prepared,
+    o2=prepared.o2,
+)
+```
+
+随后才构造 modified O2 并执行 intervention continuation。
+
+------
+
+## π0.5
+
+正确调用顺序：
 
 ```python
 prepared = prepare_pi05_context(
-    *,
-    policy,
-    observation,
-    noise,
+    ...,
+    noise=fixed_noise,
+)
+
+reference = run_pi05_reference(
+    prepared=prepared,
+)
+
+continued = continue_pi05_from_p2(
+    prepared=prepared,
+    base_p2=prepared.base_p2,
 )
 ```
 
-where `policy` is an already loaded JAX/NNX `pi05_libero` OpenPI policy or an equivalent repository-local wrapper that exposes the same model plus input/output transforms.
+随后才构造 modified base P2。
 
-Required noise:
+------
 
-```text
-shape: [1, 10, 32]
-finite floating array
-explicitly supplied
-reused exactly between clean and intervention continuations
-no implicit resampling is allowed
-```
-
-The prepared object must be immutable or caller-read-only and contain at least:
-
-```text
-base_p2
-  [1, 256, 2048]
-
-left_p2
-  [1, 256, 2048]
-
-right_p2
-  [1, 256, 2048]
-
-right_image_mask
-  False for the deployed zero-filled right-wrist stream
-
-fixed prompt embeddings / masks / prefix context
-fixed noise
-input/output transform context required to reproduce Policy.infer semantics
-```
-
-Prepared feature tensors/arrays must preserve the model-native dtype/device/backend representation used by the authoritative forward path.
-
-Only base-camera P2 is replaceable in this stage.
-
-## 4.4 Continuation API
-
-Implement an explicit continuation function equivalent in responsibility to:
-
-```python
-result = continue_pi05_from_p2(
-    *,
-    prepared,
-    base_p2,
-)
-```
-
-Input contract:
-
-```text
-base_p2 shape: [1, 256, 2048]
-finite values required
-dtype/device compatible with the downstream JAX/NNX path
-```
-
-The continuation must preserve:
-
-```text
-left/right camera representations
-prompt embeddings
-masks
-initial Gaussian noise
-Euler integration settings
-checkpoint normalization statistics
-output transforms
-```
-
-Allowed handling:
-
-```text
-shape validation
-finite-value validation
-required dtype/device conversion on the supplied override only
-```
-
-Any allowed conversion must not mutate or replace the original clean feature stored in `prepared`.
-
-Forbidden semantic handling:
-
-```text
-normalization
-clipping
-reprojection
-automatic rescaling
-CCA-specific processing
-```
-
-## 4.5 π0.5 Result Semantics
-
-Expose distinct fields for the different action representations:
-
-```text
-normalized_action_chunk_32
-  shape: [1, 10, 32]
-  public type: CPU NumPy floating array
-  native model output before LIBERO dimensional trimming / output transforms
-
-normalized_action_chunk
-  shape: [1, 10, 7]
-  public type: CPU NumPy floating array
-  first seven normalized action dimensions before checkpoint unnormalization
-
-unnormalized_action_chunk
-  shape: [1, 10, 7]
-  public type: CPU NumPy floating array
-  final LIBERO action chunk after the authoritative output-transform path
-```
-
-Primary cross-model comparison object:
-
-```python
-result.unnormalized_action_chunk[:, 0, :3]
-```
-
----
-
-# 5. Authoritative Reference Helpers
-
-Clean-equivalence validation requires repository-local reference helpers that expose intermediate quantities from **one authoritative forward/inference invocation**, rather than comparing quantities assembled from unrelated repeated calls.
-
-## 5.1 OpenVLA Reference
-
-The OpenVLA reference helper must expose, from the authoritative original-policy path or a semantically identical repository-local wrapper:
-
-```text
-action token IDs
-normalized action
-unnormalized action
-deployed action
-```
-
-The helper must not alter decoding semantics.
-
-## 5.2 π0.5 Reference
-
-The π0.5 reference helper must expose, from one fixed-noise authoritative inference path:
-
-```text
-normalized_action_chunk_32 [1,10,32]
-normalized_action_chunk    [1,10,7]
-unnormalized_action_chunk  [1,10,7]
-```
-
-It must reuse the same `pi05_libero` input/output transforms as `Policy.infer()`.
-
-These helpers are validation instrumentation, not new policy semantics.
-
----
-
-# 6. Unit-Level Clean-Equivalence Semantics
-
-Implementation/unit tests should verify continuation equivalence with synthetic or controlled local fixtures wherever possible.
-
-The intended real-runtime numerical gates remain:
+# 11. Clean-Equivalence Criteria
 
 ## OpenVLA
 
+两个 observations 均要求：
+
 ```text
-action token IDs: exact match
-discrete deployed gripper decision: exact match
-continuous quantities: rtol = 0, atol = 1e-8
+action_token_ids:
+exact match
+
+normalized_action:
+rtol = 0
+atol = 1e-8
+
+unnormalized_action:
+rtol = 0
+atol = 1e-8
+
+deployed_action:
+rtol = 0
+atol = 1e-8
+
+discrete gripper:
+exact match
+```
+
+------
+
+## π0.5
+
+两个 observations 均要求：
+
+```text
+normalized_action_chunk_32:
+rtol = 0
+atol = 1e-6
+
+normalized_action_chunk:
+rtol = 0
+atol = 1e-6
+
+unnormalized_action_chunk:
+rtol = 0
+atol = 1e-6
+```
+
+并使用完全相同的 fixed noise。
+
+------
+
+# 12. Clean Gate
+
+只有对应模型 clean-equivalence 全部通过后，才允许执行该模型的 intervention smoke。
+
+```text
+OpenVLA:
+2/2 clean-equivalence PASS
+
+π0.5:
+2/2 clean-equivalence PASS
+```
+
+若任一 observation FAIL：
+
+```text
+该模型 real smoke = BLOCKED
+```
+
+必须：
+
+```text
+保存 diagnostics
+停止该模型 intervention smoke
+不放宽 tolerance
+不替换 observation
+不修改 checkpoint/config
+```
+
+------
+
+# 13. Intervention Metrics
+
+## OpenVLA
+
+记录：
+
+```text
+||clean O2||
+||intended ΔO2||
+||actual ΔO2||
+actual relative perturbation
+
+clean unnormalized_action[:3]
+modified unnormalized_action[:3]
+
+Δtranslation
+||Δtranslation||_2
 ```
 
 ## π0.5
 
-with exactly the same explicit noise tensor:
+记录：
 
 ```text
-normalized_action_chunk_32: rtol = 0, atol = 1e-6
-normalized_action_chunk:    rtol = 0, atol = 1e-6
-unnormalized_action_chunk:  rtol = 0, atol = 1e-6
+||clean P2||
+||intended ΔP2||
+||actual ΔP2||
+actual relative perturbation
+
+clean unnormalized_action_chunk[0,0,:3]
+modified unnormalized_action_chunk[0,0,:3]
+
+Δtranslation
+||Δtranslation||_2
 ```
 
-However, **real GPU/server clean-equivalence execution is not authorized by this contract**. Its observations, runtime parameters and commands must be frozen separately.
+所有 feature 和 action 必须 finite。
 
----
+------
 
-# 7. Real Intervention Smoke — Deferred
+# 14. Intervention Smoke PASS
 
-Real clean-equivalence and real intervention smoke are a separate authorization stage.
-
-A later smoke contract must freeze at minimum:
+每个模型要求：
 
 ```text
-exact observation/sample IDs
-number of observations
-batch size
-checkpoint/runtime identities
-Gaussian RNG seed
-RNG implementation
-perturbation dtype
-whether direction normalization is global or per sample
-engineering epsilon
-reported quantities
-output directory / overwrite safety
-server command
-PASS/BLOCKED criteria
-```
-
-The later smoke may use deterministic synthetic native-space perturbations only.
-
-It must not use CCA directions and must not make policy-sensitivity claims.
-
-No real intervention smoke is authorized now.
-
----
-
-# 8. Authorized Implementation File Boundary
-
-Preferred minimal repository-local files:
-
-```text
-shared_feature/openvla_intervention.py
-shared_feature/pi05_intervention.py
-tests/test_openvla_intervention.py
-tests/test_pi05_intervention.py
-```
-
-`shared_feature/__init__.py` may be changed only if required to expose the new APIs.
-
-Small adjacent repository-local helper/test files are allowed only when necessary for the explicit reference helpers or shared dataclasses. Avoid unrelated refactoring.
-
-Forbidden modifications:
-
-```text
-../openvla/**
-../openpi/**
-C5-BM formal artifacts
-C2/C3/C4/C5-A/C5-B formal artifacts
-existing C2/C3 scientific semantics
-```
-
----
-
-# 9. Required Unit Tests
-
-At minimum test:
-
-## OpenVLA
-
-```text
-B == 1 enforcement
-O2 shape validation
-finite-value validation
-prepared-state field/immutability semantics
-supplied O2 is actually consumed
-no hidden normalize/clip/reproject path
-reference/result action semantic separation
-clean continuation equivalence on controlled fixtures
-```
-
-## π0.5
-
-```text
-base P2 shape validation
-finite-value validation
-B == 1 enforcement
-noise shape [1,10,32]
-noise finite-value validation
-no implicit noise resampling
-prepared-state field/immutability semantics
-supplied base P2 is actually consumed
-left/right P2 and prompt/mask/noise remain fixed
-32D vs 7D action semantic separation
-fixed-noise continuation equivalence on controlled fixtures
-```
-
-## Regression / Integrity
-
-```text
-relevant existing tests remain passing
-no upstream repository modification
-no C5-BM artifact modification
-no C6-B code added
-```
-
----
-
-# 10. Implementation Completion Gate
-
-Following the separate implementation authorization and completed unit-level
-validation, the current stage is:
-
-```text
-C6 interface implementation: UNIT-LEVEL PASS
-C6 unit validation: PASS
-C6 real clean-equivalence / intervention smoke: NEXT / NOT AUTHORIZED
-```
-
-Implementation reached `UNIT-LEVEL PASS` because:
-
-```text
-OpenVLA explicit continuation API implemented
+clean-equivalence PASS
 AND
-π0.5 explicit continuation API implemented
+actual modified feature differs from clean feature
 AND
-reference helpers implemented
+continuation consumes the supplied modified native feature
 AND
-focused unit tests pass
+all outputs finite
 AND
-relevant regression tests pass
-AND
-no upstream source repository was modified
-AND
-no real GPU/server intervention smoke was executed
-AND
-no C6-B scientific analysis was implemented
+at least 1/2 observations produces translation response above numerical floor
 ```
 
-Then stop.
+Numerical floor：
 
----
+```text
+OpenVLA:
+||Δtranslation||_2 > 1e-8
 
-# 11. Final Stop Condition
+π0.5:
+||Δtranslation||_2 > 1e-6
+```
 
-This contract does not authorize real server intervention experiments.
+这些仅用于排除 numerical-noise-level 无响应。
 
-After implementation/unit validation:
+不得据此声明：
+
+```text
+policy sensitive
+CCA direction relevant
+shared representation action-relevant
+transferable attack success
+```
+
+------
+
+# 15. Runner Output
+
+真实执行阶段使用新目录：
+
+```text
+experiment_inbox/c6-real-smoke-output/
+```
+
+正式执行前目标目录必须不存在或为空。
+
+建议分阶段文件：
+
+```text
+openvla_results.json
+pi05_results.json
+results.json
+summary.md
+```
+
+OpenVLA 和 π0.5 runner 分别只写自己的结果文件。
+
+aggregator 在两侧结果存在后生成：
+
+```text
+results.json
+summary.md
+```
+
+必须记录至少：
+
+```text
+git commit
+observation IDs
+observation/image hashes
+checkpoint/config identities
+resolved checkpoint paths
+runtime versions
+
+noise RNG implementation
+noise seed
+noise dtype
+
+direction RNG implementation
+per-model/per-observation direction seeds
+
+alpha
+intended perturbation metrics
+actual perturbation metrics
+
+clean-equivalence metrics
+intervention metrics
+
+per-observation results
+per-model PASS/BLOCKED
+overall PASS/BLOCKED
+```
+
+不得覆盖既有正式输出。
+
+------
+
+# 16. Authorized Runner Implementation Scope
+
+本合同授权实现：
+
+```text
+scripts/c6_openvla_real_smoke.py
+scripts/c6_pi05_real_smoke.py
+scripts/c6_real_smoke_summary.py
+```
+
+以及必要的：
+
+```text
+CPU-only tests
+static validation tests
+small repository-local helpers
+```
+
+runner implementation 必须复用现有：
+
+```text
+openvla_intervention.py
+pi05_intervention.py
+```
+
+不得复制并重新实现 intervention scientific semantics。
+
+------
+
+# 17. Runner Unit-Level Completion Gate
+
+runner implementation 达到：
+
+```text
+UNIT-LEVEL PASS
+```
+
+iff：
+
+```text
+两个 model runner 均实现
+AND
+aggregator 实现
+AND
+frozen observation/config/RNG 参数被验证
+AND
+CPU/static tests PASS
+AND
+relevant regression tests PASS
+AND
+lint/format PASS
+AND
+git diff --check PASS
+AND
+未运行真实 checkpoint inference
+```
+
+完成后：
 
 ```text
 STOP
 ```
 
-Next required stage:
+进行一次 read-only runner audit。
+
+------
+
+# 18. Real Execution Authorization
+
+本合同当前仍不授权真实执行。
+
+当前状态必须保持：
 
 ```text
-C6 real clean-equivalence / intervention-smoke contract
+C6 real-smoke runner implementation: AUTHORIZED
+C6 real-smoke runner unit validation: AUTHORIZED
+
+C6 real checkpoint execution: NOT AUTHORIZED
 ```
 
-Only after that stage passes may the project define a separate C6-B scientific contract for action-relevant shared-direction discovery.
+只有 runner implementation + audit PASS 后，才单独授权：
+
+```text
+OpenVLA real smoke execution
+π0.5 real smoke execution
+result aggregation
+```
+
+并由用户在对应服务器环境执行。
+
+------
+
+# 19. Explicit Restrictions
+
+禁止：
+
+```text
+修改 frozen intervention modules 的科学语义
+修改 ../openvla/**
+修改 ../openpi/**
+修改 C5/C5-BM artifacts
+
+替换 frozen observations
+修改 tolerance 追求 PASS
+修改 checkpoint/config 追求 PASS
+
+使用 CCA directions
+搜索 epsilon
+搜索 sensitive direction
+JVP/gradient screening
+C6-B
+Tex3D optimization
+```
+
+若 runner implementation 暴露现有 intervention API bug：
+
+```text
+STOP
+→ 报告 blocker
+→ 单独修复
+→ 重新 unit audit
+```
+
+不得在 runner 内静默绕过。
+
+------
+
+# 20. Final Stage Boundary
+
+runner audit PASS 后，下一步才是：
+
+```text
+C6 REAL EXECUTION AUTHORIZATION
+```
+
+真实运行成功后才允许判定：
+
+```text
+C6 real clean-equivalence / intervention smoke: PASS
+```
+
+只有该状态 PASS 后，才允许起草：
+
+```text
+C6-B action-relevant shared-direction scientific contract
+```
