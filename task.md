@@ -5,8 +5,8 @@
 ```text
 C5-BM CONTRACT REVIEW: PASS
 C5-BM scientific / engineering contract: FROZEN
-C5-BM implementation: AUTHORIZED
-C5-BM formal materialization: NOT AUTHORIZED
+C5-BM implementation: UNIT-LEVEL PASS
+C5-BM formal materialization: FORMAL COMPLETE / PASS
 ```
 
 This contract defines the minimum scientific, numerical, provenance, and engineering requirements for materializing a new authoritative reusable PCA+CCA mapping artifact for the C6 mainline.
@@ -613,10 +613,10 @@ The final read-only contract audit passed after the output-safety, mathematical
 notation, and document-integrity corrections were applied.
 
 This freezes the C5-BM scientific and engineering contract. C5-BM implementation
-is now separately authorized under Section 16, but formal materialization remains
-not authorized. The contract does not authorize the intervention interface, C6-B
-policy-sensitivity analysis, native intervention vectors, token scope,
-perturbation scale, or Tex3D loss design.
+has completed unit-level validation under Section 16, and formal materialization
+has completed successfully under Section 17. The contract does not authorize
+the intervention interface, C6-B policy-sensitivity analysis, native intervention
+vectors, token scope, perturbation scale, or Tex3D loss design.
 
 ---
 
@@ -625,15 +625,15 @@ perturbation scale, or Tex3D loss design.
 ### Status boundary
 
 ```text
-C5-BM implementation: AUTHORIZED
-C5-BM formal materialization: NOT AUTHORIZED
+C5-BM implementation: UNIT-LEVEL PASS
+C5-BM formal materialization: FORMAL COMPLETE / PASS
 C6 intervention-interface implementation: NOT AUTHORIZED
 C6-B policy-sensitivity analysis: NOT AUTHORIZED
 ```
 
-This section authorizes implementation and focused synthetic/unit testing of the
-frozen C5-BM contract. It does not authorize formal execution on the frozen
-200-pair dataset or publication of the authoritative mapping artifact.
+This section records the completed implementation and focused synthetic/unit
+testing of the frozen C5-BM contract. The completed formal execution is recorded
+separately in Section 17.
 
 ### Objective and minimum scope
 
@@ -690,5 +690,45 @@ Implementation is complete only when focused tests and diff-integrity checks pas
 historical formal artifacts remain unchanged, no authoritative mapping has been
 published, and no C6 intervention/sensitivity code has been added.
 
-After implementation and tests, stop. Formal C5-BM materialization, intervention
-interfaces, C6-B, and Tex3D optimization each require separate authorization.
+The implementation and its tests are complete. Intervention interfaces, C6-B, and
+Tex3D optimization each still require separate authorization.
+
+---
+
+## 17. Formal Materialization Record
+
+```text
+C5-BM formal materialization: FORMAL COMPLETE / PASS
+```
+
+The authorized formal C5-BM execution completed against the frozen 200-pair C4
+manifest and the completed historical four-file C5-B output set, using
+`scripts/c5bm_authoritative_mapping.py` as unit-reviewed. It published and
+successfully reloaded exactly:
+
+```text
+mapping.npz
+metadata.json
+validation.json
+summary.md
+```
+
+The formal validation record confirms:
+
+- `c5bm_result == PASS`;
+- materialization identity `c5bm_o2_p2_99_true_train_v1`;
+- repository commit `3cc91c17afe4a23fa78b43ecb368aeb796645f9d`;
+- complete source-feature validation for all `200 / 200` paired archives;
+- matching C4 paired-manifest identity;
+- all four historical C5-B file hashes recorded and unchanged;
+- all nine persisted mapping-array hashes verified;
+- `262` canonical components with deterministic paired sign canonicalization;
+- historical TRAIN Top5Mean and HELD-OUT Top1/Top5Mean/Top10Mean reproduced with
+  absolute difference `0.0`, within the frozen `1e-8` tolerance;
+- transactional publication validation passed.
+
+The published artifact is the new authoritative reusable mapping defined by this
+contract; it is not a recovery of the historical unsaved in-memory matrices.
+Formal C5-BM materialization must not be rerun or overwritten without a new
+explicit contract. This completed result does not authorize the C6 intervention
+interface, C6-B policy sensitivity, or Tex3D optimization.

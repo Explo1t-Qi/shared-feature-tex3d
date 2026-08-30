@@ -238,10 +238,10 @@ C5-B formal execution                      FORMAL COMPLETE / PASS
 C5 representation-stage                    FORMAL COMPLETE / PASS
 C6-A policy-sensitivity interface closure   COMPLETE / FROZEN
 C5-BM scientific/engineering contract       FROZEN
-C5-BM implementation                        NEXT / AUTHORIZED / NOT STARTED
-C5-BM formal materialization                NOT AUTHORIZED
-C6 intervention-interface implementation   NOT STARTED
-C6-B policy-sensitivity analysis            NOT STARTED
+C5-BM implementation                        UNIT-LEVEL PASS
+C5-BM formal materialization                FORMAL COMPLETE / PASS
+C6 intervention-interface implementation   NEXT / NOT STARTED / NOT AUTHORIZED
+C6-B policy-sensitivity analysis            NOT STARTED / NOT AUTHORIZED
 Final overall research gate                OPEN / NOT DEFINED HERE
 Policy/action relevance                    NOT STARTED
 Transferability / Tex3D optimization       NOT STARTED
@@ -294,8 +294,8 @@ review 与 contract review 已完成，冻结状态为
 `INTERFACE FEASIBLE WITH EXPLICIT PREREQUISITES`。该 interface closure 不构成
 policy/action relevance evidence。C5-BM scientific/engineering contract 已通过最终
 read-only audit 并冻结；它定义新的 authoritative mapping materialization，而不声称
-恢复历史未保存矩阵。其 implementation 已授权但尚未开始，formal materialization
-仍未授权。
+恢复历史未保存矩阵。其 implementation 已通过 unit-level validation，formal
+materialization 已完成并通过全部验证，结果为 `PASS`。
 
 ---
 
@@ -1098,19 +1098,24 @@ scope、perturbation scale、candidate-selection rule 或 statistical threshold�
 - intervention；
 - action prediction。
 
-在 C5-BM mapping materialization 和独立 intervention-interface prerequisite
-完成、且 C6-B 方法正式讨论和冻结之前，不应提前选定其中任意一种。
+在独立 intervention-interface prerequisite 完成、且 C6-B 方法正式讨论和冻结之前，
+不应提前选定其中任意一种。
 
-### DECISION — C5-BM Contract Freeze
+### DECISION / FACT — C5-BM Authoritative Mapping Materialization
 
 C5-BM scientific/engineering contract 的最终 read-only audit 已通过，当前
-`task.md` 是该阶段的冻结 authority。合同仅冻结未来 materialization 的输入、
+`task.md` 是该阶段的冻结 authority。合同冻结该 materialization 的输入、
 O2↔P2 99%-PCA true-TRAIN 重拟合、确定性符号规范、历史标量复现、产物完整性与
 事务发布要求。
 
-这不等于 C5-BM 已实现或已正式物化。Implementation 当前为 `AUTHORIZED / NOT
-STARTED`，formal materialization 仍为 `NOT AUTHORIZED`。C5-BM 也不定义 native
-intervention vector、token scope、epsilon、C6-B sensitivity metric 或 Tex3D loss。
+C5-BM implementation 为 `UNIT-LEVEL PASS`，formal materialization 已完成并达到
+`FORMAL COMPLETE / PASS`。正式验证覆盖全部 `200 / 200` source feature pairs，确认
+四个历史 C5-B 文件未变化、九个 mapping arrays 的内容哈希全部匹配，并持久化
+`262` 个 canonical components；冻结的四个历史标量均以绝对差 `0.0` 复现。
+
+该产物是新的 authoritative reusable mapping，不是历史未保存内存矩阵的恢复。
+C5-BM 也不定义 native intervention vector、token scope、epsilon、C6-B sensitivity
+metric 或 Tex3D loss。
 
 ---
 
@@ -1178,13 +1183,13 @@ C6-A policy-sensitivity interface closure — COMPLETE / FROZEN
         ↓
 C5-BM scientific/engineering contract — FROZEN
         ↓
-C5-BM implementation — NEXT / AUTHORIZED / NOT STARTED
+C5-BM implementation — UNIT-LEVEL PASS
         ↓
-C5-BM formal materialization — NOT AUTHORIZED
+C5-BM formal materialization — FORMAL COMPLETE / PASS
         ↓
-O2/P2 intervention-interface contract and implementation — NOT STARTED
+O2/P2 intervention-interface contract and implementation — NEXT / NOT STARTED / NOT AUTHORIZED
         ↓
-C6-B policy-sensitivity contract and analysis — NOT STARTED
+C6-B policy-sensitivity contract and analysis — NOT STARTED / NOT AUTHORIZED
         ↓
 shared + action-relevant directions
         ↓
@@ -1203,9 +1208,9 @@ held-out cross-VLA transfer evaluation
 C5-A 的正式结果为 `GO`，C5-B / SVCCA 的正式结果为 `PASS`，因此冻结的 joint
 gate 得到 `C5 representation-stage PASS`。C6-A interface closure 现已完成并冻结为
 `INTERFACE FEASIBLE WITH EXPLICIT PREREQUISITES`。该结论不是 policy/action
-relevance PASS；C5-BM contract 已冻结，implementation 已授权但尚未开始，formal
-materialization 仍未授权。最终 overall research gate 仍为 `OPEN / NOT DEFINED
-HERE`。
+relevance PASS；C5-BM contract 已冻结，implementation 已达到 `UNIT-LEVEL PASS`，
+formal materialization 已正式完成并验证为 `PASS`。最终 overall research gate 仍为
+`OPEN / NOT DEFINED HERE`。
 
 如果 C5-A NO-GO，应停止并重新评估当前 frozen geometry hypothesis；不得静默
 更换 C5-A metric、split、null 或 threshold。无论 C5-A 结果如何，都不能将其
@@ -1240,18 +1245,19 @@ task.md
 
 ```text
 1. pilot-v0.2-spec.md        PASS
-2. task.md                   C5-BM IMPLEMENTATION AUTHORIZED
-3. AGENTS.md                 C5-BM AUTHORIZATION SYNCHRONIZED
-4. research-map.md           C5-BM AUTHORIZATION SYNCHRONIZED
+2. task.md                   C5-BM FORMAL COMPLETE / PASS
+3. AGENTS.md                 C5-BM FORMAL RESULT SYNCHRONIZED
+4. research-map.md           C5-BM FORMAL RESULT SYNCHRONIZED
 ```
 
 Pilot v0.1 remains historical and unchanged.
 
 `AGENTS.md` distinguishes v0.1 and v0.2 routing and preserves the completed C5-A,
 C5-B, representation-stage, and C6-A interface-closure records. The current
-`task.md` is the frozen C5-BM scientific and engineering authority and now
-authorizes C5-BM implementation. It does not authorize formal materialization,
-intervention-interface implementation, or formal policy/action experiments.
+`task.md` is the frozen C5-BM scientific and engineering authority. C5-BM
+implementation has reached `UNIT-LEVEL PASS`, and formal materialization has
+reached `FORMAL COMPLETE / PASS`. It does not authorize intervention-interface
+implementation or formal policy/action experiments.
 
 The C5-D0 collector has reached `UNIT-LEVEL PASS`, its reduced real integration
 smoke has been audited as `PASS`, and the formal Pilot v0.2 collection has reached
@@ -1268,10 +1274,11 @@ C5-B / SVCCA implementation and formal execution are complete, producing
 `C5-B PASS` and therefore `C5 representation-stage PASS` under the frozen joint
 gate. The final overall research gate remains `OPEN / NOT DEFINED HERE`;
 C6-A interface closure is `COMPLETE / FROZEN`, with status
-`INTERFACE FEASIBLE WITH EXPLICIT PREREQUISITES`. C5-BM contract is `FROZEN` and
-its implementation is `NEXT / AUTHORIZED / NOT STARTED`; formal materialization
-remains `NOT AUTHORIZED`. Intervention-interface implementation, C6-B policy/action
-relevance, transferability, and Tex3D optimization remain `NOT STARTED`.
+`INTERFACE FEASIBLE WITH EXPLICIT PREREQUISITES`. C5-BM contract is `FROZEN`, its
+implementation is `UNIT-LEVEL PASS`, and formal materialization is `FORMAL
+COMPLETE / PASS`. Intervention-interface implementation is `NEXT / NOT STARTED /
+NOT AUTHORIZED`; C6-B policy/action relevance, transferability, and Tex3D
+optimization remain `NOT STARTED`.
 
 ---
 
