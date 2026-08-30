@@ -1,734 +1,579 @@
-# C5-BM — Authoritative Mapping Materialization Contract
+# C6 — O2/P2 Intervention-Interface Implementation Contract
 
 ## Contract Status
 
 ```text
-C5-BM CONTRACT REVIEW: PASS
-C5-BM scientific / engineering contract: FROZEN
-C5-BM implementation: UNIT-LEVEL PASS
 C5-BM formal materialization: FORMAL COMPLETE / PASS
-```
-
-This contract defines the minimum scientific, numerical, provenance, and engineering requirements for materializing a new authoritative reusable PCA+CCA mapping artifact for the C6 mainline.
-
-It does **not** authorize C6-B policy-sensitivity analysis, intervention-vector design, token intervention, or Tex3D optimization.
-
----
-
-## 1. Purpose
-
-C5-B established that OpenVLA O2 and π0.5 P2 admit a statistically non-random explicit shared space under TRAIN-only PCA + ordinary linear CCA.
-
-However, the historical formal C5-B artifacts did **not** persist the fitted mapping objects required to reuse that shared coordinate system directly.
-
-The purpose of C5-BM is therefore:
-
-> perform one explicitly authorized re-fit under the frozen primary C5-B scientific configuration, validate that the re-fit reproduces the historically persisted C5-B scientific results, and publish a new versioned authoritative mapping artifact for all future C6 work.
-
-C5-BM is an **engineering / provenance prerequisite**.
-
-It is **not** a new representation-similarity experiment and does not change the historical C5-B PASS conclusion.
-
----
-
-## 2. Historical Limitation
-
-The historical C5-B run created, in memory, objects including:
-
-- PCA TRAIN means;
-- PCA bases;
-- CCA whitening transforms;
-- CCA mappings \(W_A\) and \(W_B\);
-- canonical correlations \(\sigma\).
-
-Those objects were not fully persisted as formal reusable artifacts.
-
-Therefore:
-
-- the exact historical in-memory matrices cannot be recovered or verified element-by-element;
-- the project must not claim that the new materialized matrices are identical to the historical unsaved matrices;
-- the historical scientific conclusion remains valid because the formal C5-B scalar/statistical results were already frozen.
-
-The new C5-BM artifact is a **new authoritative reusable mapping**, not a recovered historical memory image.
-
----
-
-## 3. Authorized Materialization Scope
-
-The required C5-BM scope is intentionally minimal.
-
-### Required configuration
-
-```text
-representation pair:
-O2 ↔ P2
-
-PCA:
-99% explained variance
-
-fit data:
-TRAIN only
-
-pairing:
-true, unpermuted pairing
-
-estimator:
-the frozen C5-B PCA + ordinary linear CCA implementation
-```
-
-This configuration becomes the authoritative shared-coordinate reference for the C6 mainline.
-
-### Intentionally excluded
-
-The following are not required for this materialization:
-
-```text
-O2 ↔ P2 @95% PCA
-O1-S ↔ P1 @99% PCA
-O1-S ↔ P1 @95% PCA
-all null / permuted fits
-```
-
-These configurations remain valid C5 robustness/control evidence, but they are intentionally excluded from the minimum C6 mapping artifact.
-
-If future work needs them, they require a separately declared materialization scope.
-
----
-
-## 4. Frozen Inputs and Configuration Identity
-
-The implementation must use the same frozen scientific inputs/configuration as the primary historical C5-B fit.
-
-At minimum, the contract must identify and verify:
-
-- formal C4 paired manifest;
-- frozen TRAIN / HELD-OUT split manifest;
-- canonical observation ordering;
-- authoritative token-row ordering defined procedurally as:
-  - iterate observations in frozen split / C4-C5-B record order;
-  - for each observation, consume the stored NPZ token rows in original row order `0..255`;
-  - flatten observation-major, then token-major;
-  - perform no token sorting, matching, spatial remapping, or reordering;
-- O2 node identity;
-- P2 node identity;
-- PCA cutoff = `0.99`;
-- true, unpermuted TRAIN pairing;
-- current frozen C5-B estimator implementation;
-- float64 fitting semantics where used by the existing estimator.
-
-Any mismatch in required discrete/configuration identity is a blocking error.
-
-### 4.1 Historical C5-B formal result as an explicit input
-
-C5-BM must also take the historical formal C5-B output set as an explicit provenance/validation input.
-
-The required historical formal files are:
-
-```text
-split_manifest.json
-alignment_summary.json
-null_alignment_metrics.npz
-summary.md
-```
-
-Requirements:
-
-- all four required files must exist;
-- each required file must satisfy the expected historical schema/role;
-- `alignment_summary.json` must report the completed historical C5-B run, including `run_status == COMPLETED` and `c5b_result == PASS`;
-- the historical source paired-manifest identity recorded by C5-B must be consistent with the frozen formal input used by C5-BM;
-- SHA-256 over exact file bytes must be computed for all four required historical files before materialization;
-- the hashes must be recomputed after materialization and must remain identical;
-- the new C5-BM metadata/validation must persist these historical file hashes, including the exact hash of `alignment_summary.json` used as the source of historical scalar metrics.
-
-Additional unrelated files in the historical directory must not be interpreted as C5-BM inputs unless explicitly declared.
-
-### 4.2 Portable identity and hash semantics
-
-Use the following identity rules:
-
-- JSON / NPZ / source feature archive / historical artifact file identity:
-  `SHA-256` over exact file bytes;
-- serialized format:
-  `sha256:<64 lowercase hex>`;
-- array content hash:
-  `SHA-256` over contiguous array bytes, with dtype and shape stored separately;
-- paired-manifest and split content hashes are the authoritative portable identities;
-- resolved absolute filesystem paths are runtime provenance only and must not serve as portable scientific identity.
-
-Before fitting, reuse the existing C2/C3/C4 validation logic to validate the complete formal paired input set and all 200 paired source feature archives.
-
-Do not create a new incompatible C5-BM-specific feature-validation semantics when the existing validators already cover the required checks.
-
----
-
-## 5. Authorized Re-Fit Semantics
-
-Once implementation and formal materialization are separately authorized, C5-BM
-authorizes exactly one new fit under the following frozen semantics.
-
-The implementation must:
-
-1. load the frozen formal inputs;
-2. reproduce the primary C5-B O2↔P2 99%-PCA TRAIN fit;
-3. compute the PCA and CCA mapping objects;
-4. apply deterministic canonical ordering and sign canonicalization;
-5. validate historically persisted scalar results;
-6. publish the new artifact only if all required validation passes.
-
-This re-fit must be recorded explicitly as a new materialization event.
-
-It must not be described as:
-
-```text
-recovery of the exact historical C5-B mapping
-```
-
----
-
-## 6. Canonical Component Ordering
-
-The fitted canonical components must preserve the canonical ordering defined by the CCA estimator.
-
-The saved artifact must guarantee that, for each component index \(k\):
-
-```text
-W_A[:, k]
-W_B[:, k]
-sigma[k]
-```
-
-refer to the same canonical component.
-
-The full fitted canonical-correlation vector:
-
-\[
-\sigma = [\sigma_1,\ldots,\sigma_K]
-\]
-
-must be persisted.
-
----
-
-## 7. Deterministic Sign Canonicalization
-
-CCA has a pairwise sign ambiguity:
-
-\[
-(d_A,d_B)
-\equiv
-(-d_A,-d_B).
-\]
-
-Because future C6 work may refer to `+d_k` and `-d_k`, C5-BM must impose a deterministic sign convention.
-
-### Frozen sign rule
-
-For each canonical component \(k\), compute the native-feature-space linear readout vectors:
-
-\[
-q_{A,k}=V_AW_A[:,k],
-\]
-
-\[
-q_{B,k}=V_BW_B[:,k].
-\]
-
-Concatenate them in fixed order:
-
-```text
-q_k = concat(q_A,k, q_B,k)
-```
-
-using:
-
-```text
-OpenVLA O2 coordinates first
-π0.5 P2 coordinates second
-```
-
-Before selecting the sign anchor, require:
-
-- `q_k` is finite float64;
-- `max(abs(q_k)) > 0`.
-
-If `q_k` contains any non-finite value or is all-zero, C5-BM is **BLOCKED**.
-
-Find:
-
-\[
-j^*=\arg\max_j |q_k[j]|.
-\]
-
-If multiple entries have exactly the same maximum absolute value, choose the **smallest concatenated index**.
-
-Then:
-
-- if \(q_k[j^*] > 0\), keep the pair unchanged;
-- if \(q_k[j^*] < 0\), multiply both \(W_A[:,k]\) and \(W_B[:,k]\) by \(-1\).
-
-Only paired sign flips are allowed: `W_A[:,k]` and `W_B[:,k]` must never be sign-flipped independently.
-
-The corresponding \(\sigma_k\) is unchanged.
-
-### Important boundary
-
-This use of \(VW\) is **only a sign-canonicalization rule**.
-
-It does **not** imply that \(VW[:,k]\) is the future native-space intervention/synthesis vector.
-
-That scientific decision remains deferred to C6-B.
-
-### Limitation
-
-Sign canonicalization resolves only the ± ambiguity.
-
-It does not guarantee recovery across independent re-fits in degenerate or near-degenerate canonical subspaces where component rotation/permutation may occur.
-
-This does not block C6 because the authoritative mapping is fitted once, validated, frozen, and reused thereafter.
-
----
-
-## 8. Required Mapping Artifact Contents
-
-The new authoritative artifact must persist the complete forward shared-space mapping.
-
-### 8.1 Core arrays
-
-At minimum:
-
-- OpenVLA PCA TRAIN mean \(\mu_A\);
-- π0.5 PCA TRAIN mean \(\mu_B\);
-- OpenVLA PCA basis \(V_A\);
-- π0.5 PCA basis \(V_B\);
-- any CCA whitening/projection transforms required by the existing estimator;
-- CCA mapping \(W_A\);
-- CCA mapping \(W_B\);
-- full canonical-correlation vector `sigma`.
-
-### 8.2 Mapping identity
-
-Persist:
-
-- retained PCA dimensions;
-- PCA cutoff;
-- canonical component count;
-- canonical component ordering;
-- sign-canonicalization rule/version;
-- confirmation that `W_A[:,k]`, `W_B[:,k]`, and `sigma[k]` share the same order.
-
-### 8.3 Array metadata and integrity
-
-For every persisted array, store:
-
-- array name;
-- shape;
-- dtype;
-- content hash.
-
-This includes `sigma`.
-
-### 8.4 Provenance
-
-Persist at least:
-
-- artifact schema/version;
-- materialization/run identifier;
-- source paired-manifest identity/hash;
-- TRAIN/HELD-OUT split identity/hash;
-- source feature artifact identities/hashes;
-- node identities;
-- repository/code commit;
-- Python version;
-- NumPy version;
-- BLAS/LAPACK implementation/version where available;
-- platform information;
-- SHA-256 identities of all four required historical C5-B formal files;
-- hash of the exact `alignment_summary.json` used for historical scalar validation;
-- validation result for the complete 200-pair source feature set.
-
----
-
-## 9. Required Published Artifact Set
-
-The authoritative published artifact must contain the following four logical files:
-
-```text
-c5bm_mapping/
-├── mapping.npz
-├── metadata.json
-├── validation.json
-└── summary.md
-```
-
-### `mapping.npz`
-
-Expected to contain the fitted arrays, for example:
-
-```text
-mean_a
-mean_b
-basis_a
-basis_b
-whitening_a
-whitening_b
-w_a
-w_b
-sigma
-```
-
-Exact key names may follow the current codebase naming style, but the scientific content above is required.
-
-### `metadata.json`
-
-Contains:
-
-- schema/version;
-- fit configuration;
-- provenance;
-- array shapes/dtypes/hashes;
-- canonical ordering;
-- sign convention.
-
-### `validation.json`
-
-Contains:
-
-- exact-match checks;
-- historical scalar consistency checks;
-- tolerances;
-- PASS/BLOCKED result.
-
-### `summary.md`
-
-Human-readable publication summary.
-
-Do not add speculative C6-B intervention artifacts.
-
----
-
-## 9.1 Transactional publication semantics
-
-Publication of the authoritative C5-BM artifact must be transactional.
-
-Required behavior:
-
-- the target formal output directory must not exist or must be empty;
-- existing formal outputs must never be overwritten;
-- all frozen-input validation, historical-file hashing, fitting, sign canonicalization, and consistency validation must complete before publication;
-- all four required output files must be written and then reloaded/validated successfully before the artifact is considered published;
-- after publication, the target formal output directory must contain exactly the four required output files and no additional files;
-- any existing non-empty target directory must be rejected, regardless of whether it already contains an authoritative-publication marker;
-- a BLOCKED run, exception, or interrupted run must not leave a directory that can be mistaken for a complete authoritative publication;
-- C2/C3/C4/C5-A/C5-B input artifacts must remain unchanged.
-
-A sibling staging directory followed by atomic rename is the recommended implementation pattern, but the scientific contract freezes the transactional behavior rather than one specific filesystem mechanism.
-
----
-
-## 10. Consistency Validation
-
-The new fit must be validated only against quantities that were actually persisted by historical C5-B.
-
-### 10.1 Exact-match quantities
-
-The following must match exactly:
-
-- representation pair;
-- PCA cutoff;
-- TRAIN/HELD-OUT split identity;
-- paired-manifest identity;
-- observation ordering;
-- authoritative token-row ordering procedure and the resulting observation-major/token-major row order;
-- retained PCA dimensions;
-- other required discrete configuration metadata.
-
-### 10.2 Floating-point scalar validation
-
-Historical persisted floating-point scalar metrics must satisfy:
-
-\[
-|m_{\text{new}}-m_{\text{historical}}|
-\le 10^{-8}.
-\]
-
-Use **absolute tolerance = \(10^{-8}\)**.
-
-At minimum validate:
-
-- TRAIN Top5Mean;
-- HELD-OUT Top1;
-- HELD-OUT Top5Mean;
-- HELD-OUT Top10Mean.
-
-Where applicable:
-
-\[
-\text{TRAIN Top5Mean}
-=
-\frac{1}{5}\sum_{k=1}^{5}\sigma_k
-\]
-
-from the new fit must match the historical persisted TRAIN Top5Mean within the frozen tolerance.
-
-HELD-OUT Top1 / Top5Mean / Top10Mean recomputed using the new fitted mapping must match the corresponding historical persisted metrics within the same tolerance.
-
-### 10.3 Full sigma
-
-The newly fitted full `sigma` vector must be saved.
-
-However, the project must **not** claim element-wise validation of the full new `sigma` vector against the historical run because the historical full `sigma` vector was not persisted.
-
-### 10.4 Validation failure
-
-If any required validation fails:
-
-```text
-C5-BM = BLOCKED
-```
-
-The authoritative mapping must **not** be published.
-
-The implementation must investigate the cause.
-
-Do not respond to failure by silently:
-
-- widening the tolerance;
-- changing inputs;
-- changing ordering;
-- changing estimator behavior;
-- rewriting historical artifacts.
-
-Any scientific/configuration change requires a new explicit decision.
-
----
-
-## 11. Historical Artifact Immutability
-
-The existing formal C5-B artifacts must remain unchanged.
-
-C5-BM must:
-
-- publish a separate versioned mapping artifact;
-- record the authorized re-fit as a new event;
-- not overwrite or rewrite the historical formal C5-B outputs;
-- not retroactively claim that the new mapping was part of the historical artifact set.
-
----
-
-## 12. C5-BM PASS / BLOCKED Gate
-
-C5-BM is **PASS** iff all of the following hold:
-
-```text
-correct frozen primary configuration
-AND
-authorized re-fit completed
-AND
-required mapping arrays persisted
-AND
-full sigma persisted
-AND
-canonical ordering preserved
-AND
-deterministic sign canonicalization applied
-AND
-required provenance/integrity metadata complete
-AND
-all four required historical C5-B file identities recorded and unchanged
-AND
-complete 200-pair source feature validation passes
-AND
-exact-match validation passes
-AND
-historical scalar metrics reproduced within abs tolerance 1e-8
-AND
-transactional publication validation passes
-AND
-historical C5-B artifacts remain unchanged
-```
-
-If any required condition fails:
-
-```text
-C5-BM = BLOCKED
-```
-
-and no authoritative mapping may be released.
-
----
-
-## 13. Explicitly Deferred Questions
-
-C5-BM must **not** decide or implement:
-
-- native-space intervention/synthesis direction;
-- whether \(VW[:,k]\) is the intervention direction;
-- pseudoinverse / dual / minimum-norm intervention construction;
-- token intervention scope;
-- spatial token weighting;
-- perturbation norm;
-- perturbation scale \(\epsilon\);
-- gradient/JVP screening design;
-- final policy-sensitivity metric;
-- C6-B candidate-selection thresholds;
-- intervention-interface implementation;
-- Tex3D loss design;
-- adversarial texture optimization.
-
-These remain future C6 decisions.
-
----
-
-## 14. Expected Workflow
-
-```text
-C5-BM contract review
-        ↓
-contract freeze
-        ↓
-implementation
-        ↓
-unit/static validation
-        ↓
-independent code review
-        ↓
-formal materialization
-        ↓
-consistency validation
-        ↓
-C5-BM PASS / BLOCKED
-        ↓
-if PASS:
-separate O2/P2 intervention-interface coding contract
-```
-
-C6-B scientific design must not begin by assuming the mapping artifact exists until C5-BM has formally passed.
-
----
-
-## 15. Contract Review Record
-
-The final read-only contract audit passed after the output-safety, mathematical
-notation, and document-integrity corrections were applied.
-
-This freezes the C5-BM scientific and engineering contract. C5-BM implementation
-has completed unit-level validation under Section 16, and formal materialization
-has completed successfully under Section 17. The contract does not authorize
-the intervention interface, C6-B policy-sensitivity analysis, native intervention
-vectors, token scope, perturbation scale, or Tex3D loss design.
-
----
-
-## 16. Implementation Authorization
-
-### Status boundary
-
-```text
-C5-BM implementation: UNIT-LEVEL PASS
-C5-BM formal materialization: FORMAL COMPLETE / PASS
-C6 intervention-interface implementation: NOT AUTHORIZED
+C6 intervention-interface contract: FINAL READ-ONLY AUDIT PASS / FROZEN
+C6 interface implementation: NOT AUTHORIZED
+C6 unit validation: NOT AUTHORIZED
+C6 real clean-equivalence / intervention smoke: NOT AUTHORIZED
 C6-B policy-sensitivity analysis: NOT AUTHORIZED
+Tex3D optimization: NOT AUTHORIZED
 ```
 
-This section records the completed implementation and focused synthetic/unit
-testing of the frozen C5-BM contract. The completed formal execution is recorded
-separately in Section 17.
+This contract defines the minimum implementation boundary for explicit continuation interfaces at OpenVLA O2 and π0.5 P2.
 
-### Objective and minimum scope
-
-Implement the minimum code and tests required to support later, separately
-authorized materialization of exactly:
-
-```text
-O2 ↔ P2
-99%-PCA
-true, unpermuted TRAIN fit
-```
-
-The implementation must support:
-
-1. loading and validating the frozen formal inputs;
-2. reusing existing C2/C3/C4 validation semantics for all 200 paired archives;
-3. reproducing the frozen primary C5-B PCA and ordinary linear CCA fit;
-4. exposing and persisting PCA means, PCA bases, required whitening/projection
-   transforms, `W_A`, `W_B`, and full `sigma`;
-5. frozen canonical ordering and deterministic sign canonicalization;
-6. historical four-file identity checks and SHA-256 provenance;
-7. frozen portable file and array hashing;
-8. historical scalar validation at absolute tolerance `1e-8`;
-9. transactional publication of exactly `mapping.npz`, `metadata.json`,
-   `validation.json`, and `summary.md`;
-10. staged-output reload/integrity validation and frozen PASS/BLOCKED reporting.
-
-No formal authoritative artifact may be produced during this implementation task.
-
-### Required focused tests
-
-At minimum cover:
-
-- required mapping arrays, full `sigma`, shapes, dtypes, and reproducible hashes;
-- positive and negative sign anchors, smallest-index exact ties, non-finite and
-  all-zero rejection, and paired-only sign flipping;
-- exact-match metadata pass/fail behavior;
-- historical scalar differences at and across the `1e-8` boundary;
-- required historical hashes, post-run immutability checks, and mutation detection;
-- non-empty target rejection, no overwrite, failed-publication safety, and exact
-  four-file successful staged publication.
-
-Use synthetic/unit-level fixtures where possible. Do not run the formal 200-pair
-materialization in the test suite.
-
-### Engineering and stop conditions
-
-Inspect and reuse the current C5-B implementation and existing validators where
-appropriate. Keep the diff small, do not change public interfaces silently, and
-do not refactor unrelated code. Before coding, report the minimum production/test
-files, reused functions, how formal execution is avoided, and any blocker.
-
-Implementation is complete only when focused tests and diff-integrity checks pass,
-historical formal artifacts remain unchanged, no authoritative mapping has been
-published, and no C6 intervention/sensitivity code has been added.
-
-The implementation and its tests are complete. Intervention interfaces, C6-B, and
-Tex3D optimization each still require separate authorization.
+The interface consumes native model features. It does **not** consume CCA-space features and does not define CCA-to-native intervention directions.
 
 ---
 
-## 17. Formal Materialization Record
+## 1. Stage Objective
+
+Implement explicit, non-hook continuation paths that allow controlled replacement of:
 
 ```text
-C5-BM formal materialization: FORMAL COMPLETE / PASS
+OpenVLA O2:            [1, 256, 4096]
+π0.5 base-camera P2:   [1, 256, 2048]
 ```
 
-The authorized formal C5-BM execution completed against the frozen 200-pair C4
-manifest and the completed historical four-file C5-B output set, using
-`scripts/c5bm_authoritative_mapping.py` as unit-reviewed. It published and
-successfully reloaded exactly:
+while holding all non-intervened policy context fixed.
+
+This stage establishes an experimental instrument only. It does not establish policy/action relevance.
+
+---
+
+## 2. Explicitly Deferred Scientific Questions
+
+Do not implement or decide:
 
 ```text
-mapping.npz
-metadata.json
-validation.json
-summary.md
+CCA component selection
+CCA/shared-space → native-space perturbation construction
+shared-direction ranking
+epsilon selection for scientific analysis
+gradient/JVP policy-sensitivity screening
+C6-B sensitivity metrics
+policy/action relevance claims
+Tex3D losses
+adversarial texture optimization
 ```
 
-The formal validation record confirms:
+C6-B requires a separate scientific contract.
 
-- `c5bm_result == PASS`;
-- materialization identity `c5bm_o2_p2_99_true_train_v1`;
-- repository commit `3cc91c17afe4a23fa78b43ecb368aeb796645f9d`;
-- complete source-feature validation for all `200 / 200` paired archives;
-- matching C4 paired-manifest identity;
-- all four historical C5-B file hashes recorded and unchanged;
-- all nine persisted mapping-array hashes verified;
-- `262` canonical components with deterministic paired sign canonicalization;
-- historical TRAIN Top5Mean and HELD-OUT Top1/Top5Mean/Top10Mean reproduced with
-  absolute difference `0.0`, within the frozen `1e-8` tolerance;
-- transactional publication validation passed.
+---
 
-The published artifact is the new authoritative reusable mapping defined by this
-contract; it is not a recovery of the historical unsaved in-memory matrices.
-Formal C5-BM materialization must not be rerun or overwritten without a new
-explicit contract. This completed result does not authorize the C6 intervention
-interface, C6-B policy sensitivity, or Tex3D optimization.
+# 3. OpenVLA Interface
+
+## 3.1 Frozen Runtime Boundary
+
+The authoritative OpenVLA continuation path must use the same deployed inference semantics as the existing LIBERO/OpenVLA path.
+
+Freeze:
+
+```text
+batch size: B == 1
+checkpoint/model identity: openvla/openvla-7b-finetuned-libero-spatial
+unnorm_key: libero_spatial_no_noops
+do_sample: False
+center_crop: True
+image preprocessing: reuse the existing C1/OpenVLA LIBERO preprocessing path
+prompt construction: reuse the existing deployed C1/OpenVLA prompt path
+gripper postprocessing: identical to the existing deployed path
+```
+
+Do not create an alternative image preprocessing or prompt formatting path for the intervention interface.
+
+The authoritative interface must not modify `../openvla`.
+
+## 3.2 Preparation API
+
+Implement an explicit preparation function equivalent in responsibility to:
+
+```python
+prepared = prepare_openvla_context(
+    *,
+    model,
+    processor,
+    observation,
+    task_description,
+    pretrained_checkpoint="openvla/openvla-7b-finetuned-libero-spatial",
+    unnorm_key="libero_spatial_no_noops",
+    center_crop=True,
+)
+```
+
+`observation` is the C1 policy observation passed to the deployed OpenVLA `get_action()` path, not the raw MuJoCo observation. In the current C1 semantics it contains the policy-facing image/state fields, while `task_description` is supplied separately.
+
+`pretrained_checkpoint` is explicit for prompt-branch compatibility and provenance, but this contract freezes its authoritative value to:
+
+```text
+openvla/openvla-7b-finetuned-libero-spatial
+```
+
+Changing it is outside this contract.
+
+The preparation function must reuse existing preprocessing/prompt behavior and produce an immutable or caller-read-only prepared object containing at least:
+
+```text
+o2
+  shape: [1, 256, 4096]
+  node: projector output inserted after BOS and before text tokens
+
+all fixed downstream context required to reconstruct the same multimodal sequence and decoding configuration
+
+checkpoint/model identity
+processor/preprocessing identity or configuration
+unnorm_key
+```
+
+The exact Python class name may follow the repository style, but its fields and semantics must be explicit and tested.
+
+## 3.3 Continuation API
+
+Implement an explicit continuation function equivalent in responsibility to:
+
+```python
+result = continue_openvla_from_o2(
+    *,
+    prepared,
+    o2,
+)
+```
+
+Input contract:
+
+```text
+o2 shape: [1, 256, 4096]
+finite values required
+dtype/device must be compatible with the downstream OpenVLA model
+```
+
+Allowed handling:
+
+```text
+shape validation
+finite-value validation
+required dtype conversion
+required device placement
+```
+
+Forbidden semantic handling:
+
+```text
+normalization
+clipping
+reprojection
+automatic rescaling
+CCA-specific processing
+```
+
+The supplied O2 must be the representation actually consumed by the downstream multimodal language-model path.
+
+Forward hooks may be used only for debugging and are not an authoritative intervention mechanism.
+
+## 3.4 OpenVLA Result Semantics
+
+Expose one result object with unambiguous fields:
+
+```text
+action_token_ids
+  shape: [1, 7]
+  public type: CPU NumPy integer array
+  generated action token IDs
+
+normalized_action
+  shape: [1, 7]
+  public type: CPU NumPy floating array
+  action-token bin-center values before checkpoint-stat unnormalization
+
+unnormalized_action
+  shape: [1, 7]
+  public type: CPU NumPy floating array
+  checkpoint q01/q99 unnormalized continuous action
+
+deployed_action
+  shape: [1, 7]
+  public type: CPU NumPy floating array
+  unnormalized action followed by the existing deployed gripper processing:
+    normalize_gripper_action(..., binarize=True)
+    invert_gripper_action()
+```
+
+For dimensions 1–3, primary cross-model comparison uses the checkpoint-unnormalized translation:
+
+```python
+result.unnormalized_action[:, :3]
+```
+
+Do not retain an ambiguous public definition such as “deployed action or equivalent unnormalized translation”.
+
+---
+
+# 4. π0.5 Interface
+
+## 4.1 Frozen Runtime Boundary
+
+This contract supports only the already audited LIBERO π0.5 deployment:
+
+```text
+config: pi05_libero
+checkpoint: gs://openpi-assets/checkpoints/pi05_libero
+backend: JAX / NNX
+batch size: B == 1
+```
+
+A PyTorch backend is out of scope for this contract.
+
+The authoritative interface must not modify `../openpi`.
+
+## 4.2 Observation Boundary
+
+The public preparation API accepts the single **unbatched raw LIBERO inference dict** used by the existing `pi05_libero` `Policy.infer()` path.
+
+The authoritative preparation order is:
+
+```text
+policy input transforms
+→ Observation.from_dict
+→ preprocess_observation(None, observation, train=False)
+→ image encoder
+```
+
+This stage freezes `B == 1`; batching multiple raw inference dicts is out of scope.
+
+Do not define the intervention API around `PilotObservation` or around an already partially transformed observation as the public authoritative input.
+
+## 4.3 Preparation API
+
+Implement an explicit preparation function equivalent in responsibility to:
+
+```python
+prepared = prepare_pi05_context(
+    *,
+    policy,
+    observation,
+    noise,
+)
+```
+
+where `policy` is an already loaded JAX/NNX `pi05_libero` OpenPI policy or an equivalent repository-local wrapper that exposes the same model plus input/output transforms.
+
+Required noise:
+
+```text
+shape: [1, 10, 32]
+finite floating array
+explicitly supplied
+reused exactly between clean and intervention continuations
+no implicit resampling is allowed
+```
+
+The prepared object must be immutable or caller-read-only and contain at least:
+
+```text
+base_p2
+  [1, 256, 2048]
+
+left_p2
+  [1, 256, 2048]
+
+right_p2
+  [1, 256, 2048]
+
+right_image_mask
+  False for the deployed zero-filled right-wrist stream
+
+fixed prompt embeddings / masks / prefix context
+fixed noise
+input/output transform context required to reproduce Policy.infer semantics
+```
+
+Prepared feature tensors/arrays must preserve the model-native dtype/device/backend representation used by the authoritative forward path.
+
+Only base-camera P2 is replaceable in this stage.
+
+## 4.4 Continuation API
+
+Implement an explicit continuation function equivalent in responsibility to:
+
+```python
+result = continue_pi05_from_p2(
+    *,
+    prepared,
+    base_p2,
+)
+```
+
+Input contract:
+
+```text
+base_p2 shape: [1, 256, 2048]
+finite values required
+dtype/device compatible with the downstream JAX/NNX path
+```
+
+The continuation must preserve:
+
+```text
+left/right camera representations
+prompt embeddings
+masks
+initial Gaussian noise
+Euler integration settings
+checkpoint normalization statistics
+output transforms
+```
+
+Allowed handling:
+
+```text
+shape validation
+finite-value validation
+required dtype/device conversion on the supplied override only
+```
+
+Any allowed conversion must not mutate or replace the original clean feature stored in `prepared`.
+
+Forbidden semantic handling:
+
+```text
+normalization
+clipping
+reprojection
+automatic rescaling
+CCA-specific processing
+```
+
+## 4.5 π0.5 Result Semantics
+
+Expose distinct fields for the different action representations:
+
+```text
+normalized_action_chunk_32
+  shape: [1, 10, 32]
+  public type: CPU NumPy floating array
+  native model output before LIBERO dimensional trimming / output transforms
+
+normalized_action_chunk
+  shape: [1, 10, 7]
+  public type: CPU NumPy floating array
+  first seven normalized action dimensions before checkpoint unnormalization
+
+unnormalized_action_chunk
+  shape: [1, 10, 7]
+  public type: CPU NumPy floating array
+  final LIBERO action chunk after the authoritative output-transform path
+```
+
+Primary cross-model comparison object:
+
+```python
+result.unnormalized_action_chunk[:, 0, :3]
+```
+
+---
+
+# 5. Authoritative Reference Helpers
+
+Clean-equivalence validation requires repository-local reference helpers that expose intermediate quantities from **one authoritative forward/inference invocation**, rather than comparing quantities assembled from unrelated repeated calls.
+
+## 5.1 OpenVLA Reference
+
+The OpenVLA reference helper must expose, from the authoritative original-policy path or a semantically identical repository-local wrapper:
+
+```text
+action token IDs
+normalized action
+unnormalized action
+deployed action
+```
+
+The helper must not alter decoding semantics.
+
+## 5.2 π0.5 Reference
+
+The π0.5 reference helper must expose, from one fixed-noise authoritative inference path:
+
+```text
+normalized_action_chunk_32 [1,10,32]
+normalized_action_chunk    [1,10,7]
+unnormalized_action_chunk  [1,10,7]
+```
+
+It must reuse the same `pi05_libero` input/output transforms as `Policy.infer()`.
+
+These helpers are validation instrumentation, not new policy semantics.
+
+---
+
+# 6. Unit-Level Clean-Equivalence Semantics
+
+Implementation/unit tests should verify continuation equivalence with synthetic or controlled local fixtures wherever possible.
+
+The intended real-runtime numerical gates remain:
+
+## OpenVLA
+
+```text
+action token IDs: exact match
+discrete deployed gripper decision: exact match
+continuous quantities: rtol = 0, atol = 1e-8
+```
+
+## π0.5
+
+with exactly the same explicit noise tensor:
+
+```text
+normalized_action_chunk_32: rtol = 0, atol = 1e-6
+normalized_action_chunk:    rtol = 0, atol = 1e-6
+unnormalized_action_chunk:  rtol = 0, atol = 1e-6
+```
+
+However, **real GPU/server clean-equivalence execution is not authorized by this contract**. Its observations, runtime parameters and commands must be frozen separately.
+
+---
+
+# 7. Real Intervention Smoke — Deferred
+
+Real clean-equivalence and real intervention smoke are a separate authorization stage.
+
+A later smoke contract must freeze at minimum:
+
+```text
+exact observation/sample IDs
+number of observations
+batch size
+checkpoint/runtime identities
+Gaussian RNG seed
+RNG implementation
+perturbation dtype
+whether direction normalization is global or per sample
+engineering epsilon
+reported quantities
+output directory / overwrite safety
+server command
+PASS/BLOCKED criteria
+```
+
+The later smoke may use deterministic synthetic native-space perturbations only.
+
+It must not use CCA directions and must not make policy-sensitivity claims.
+
+No real intervention smoke is authorized now.
+
+---
+
+# 8. Authorized Implementation File Boundary
+
+Preferred minimal repository-local files:
+
+```text
+shared_feature/openvla_intervention.py
+shared_feature/pi05_intervention.py
+tests/test_openvla_intervention.py
+tests/test_pi05_intervention.py
+```
+
+`shared_feature/__init__.py` may be changed only if required to expose the new APIs.
+
+Small adjacent repository-local helper/test files are allowed only when necessary for the explicit reference helpers or shared dataclasses. Avoid unrelated refactoring.
+
+Forbidden modifications:
+
+```text
+../openvla/**
+../openpi/**
+C5-BM formal artifacts
+C2/C3/C4/C5-A/C5-B formal artifacts
+existing C2/C3 scientific semantics
+```
+
+---
+
+# 9. Required Unit Tests
+
+At minimum test:
+
+## OpenVLA
+
+```text
+B == 1 enforcement
+O2 shape validation
+finite-value validation
+prepared-state field/immutability semantics
+supplied O2 is actually consumed
+no hidden normalize/clip/reproject path
+reference/result action semantic separation
+clean continuation equivalence on controlled fixtures
+```
+
+## π0.5
+
+```text
+base P2 shape validation
+finite-value validation
+B == 1 enforcement
+noise shape [1,10,32]
+noise finite-value validation
+no implicit noise resampling
+prepared-state field/immutability semantics
+supplied base P2 is actually consumed
+left/right P2 and prompt/mask/noise remain fixed
+32D vs 7D action semantic separation
+fixed-noise continuation equivalence on controlled fixtures
+```
+
+## Regression / Integrity
+
+```text
+relevant existing tests remain passing
+no upstream repository modification
+no C5-BM artifact modification
+no C6-B code added
+```
+
+---
+
+# 10. Implementation Completion Gate
+
+After final read-only audit of this revised contract, a separate authorization may advance the stage to:
+
+```text
+C6 interface implementation: AUTHORIZED
+C6 unit validation: AUTHORIZED
+C6 real clean-equivalence / intervention smoke: NOT AUTHORIZED
+```
+
+Implementation reaches `UNIT-LEVEL PASS` only if:
+
+```text
+OpenVLA explicit continuation API implemented
+AND
+π0.5 explicit continuation API implemented
+AND
+reference helpers implemented
+AND
+focused unit tests pass
+AND
+relevant regression tests pass
+AND
+no upstream source repository was modified
+AND
+no real GPU/server intervention smoke was executed
+AND
+no C6-B scientific analysis was implemented
+```
+
+Then stop.
+
+---
+
+# 11. Final Stop Condition
+
+This contract does not authorize real server intervention experiments.
+
+After implementation/unit validation:
+
+```text
+STOP
+```
+
+Next required stage:
+
+```text
+C6 real clean-equivalence / intervention-smoke contract
+```
+
+Only after that stage passes may the project define a separate C6-B scientific contract for action-relevant shared-direction discovery.

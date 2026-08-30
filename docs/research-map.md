@@ -240,6 +240,7 @@ C6-A policy-sensitivity interface closure   COMPLETE / FROZEN
 C5-BM scientific/engineering contract       FROZEN
 C5-BM implementation                        UNIT-LEVEL PASS
 C5-BM formal materialization                FORMAL COMPLETE / PASS
+C6 intervention-interface contract         FINAL AUDIT PASS / FROZEN
 C6 intervention-interface implementation   NEXT / NOT STARTED / NOT AUTHORIZED
 C6-B policy-sensitivity analysis            NOT STARTED / NOT AUTHORIZED
 Final overall research gate                OPEN / NOT DEFINED HERE
@@ -1117,6 +1118,15 @@ C5-BM implementation 为 `UNIT-LEVEL PASS`，formal materialization 已完成并
 C5-BM 也不定义 native intervention vector、token scope、epsilon、C6-B sensitivity
 metric 或 Tex3D loss。
 
+### DECISION — C6 O2/P2 Intervention-Interface Contract Freeze
+
+当前 `task.md` 的最终 read-only audit 已通过，C6 O2/P2
+intervention-interface contract 已冻结。合同仅定义 native O2/P2 continuation、
+reference helpers 与 unit-level clean-equivalence instrumentation；implementation
+和 unit validation 仍待单独授权。Real clean-equivalence/intervention smoke、C6-B
+policy-sensitivity analysis、CCA-to-native direction construction 与 Tex3D
+optimization 均未授权。
+
 ---
 
 ## 14. Shared-Feature Attack Stage
@@ -1187,7 +1197,9 @@ C5-BM implementation — UNIT-LEVEL PASS
         ↓
 C5-BM formal materialization — FORMAL COMPLETE / PASS
         ↓
-O2/P2 intervention-interface contract and implementation — NEXT / NOT STARTED / NOT AUTHORIZED
+O2/P2 intervention-interface contract — FINAL AUDIT PASS / FROZEN
+        ↓
+O2/P2 intervention-interface implementation — NEXT / NOT STARTED / NOT AUTHORIZED
         ↓
 C6-B policy-sensitivity contract and analysis — NOT STARTED / NOT AUTHORIZED
         ↓
@@ -1245,19 +1257,19 @@ task.md
 
 ```text
 1. pilot-v0.2-spec.md        PASS
-2. task.md                   C5-BM FORMAL COMPLETE / PASS
-3. AGENTS.md                 C5-BM FORMAL RESULT SYNCHRONIZED
-4. research-map.md           C5-BM FORMAL RESULT SYNCHRONIZED
+2. task.md                   C6 INTERFACE CONTRACT FROZEN
+3. AGENTS.md                 C6 CONTRACT STATUS SYNCHRONIZED
+4. research-map.md           C6 CONTRACT STATUS SYNCHRONIZED
 ```
 
 Pilot v0.1 remains historical and unchanged.
 
 `AGENTS.md` distinguishes v0.1 and v0.2 routing and preserves the completed C5-A,
 C5-B, representation-stage, and C6-A interface-closure records. The current
-`task.md` is the frozen C5-BM scientific and engineering authority. C5-BM
-implementation has reached `UNIT-LEVEL PASS`, and formal materialization has
-reached `FORMAL COMPLETE / PASS`. It does not authorize intervention-interface
-implementation or formal policy/action experiments.
+`task.md` is the frozen C6 O2/P2 intervention-interface implementation contract.
+Its final read-only audit has passed, but implementation, unit validation, real
+clean-equivalence/intervention smoke, and formal policy/action experiments remain
+not authorized pending their respective explicit authorizations.
 
 The C5-D0 collector has reached `UNIT-LEVEL PASS`, its reduced real integration
 smoke has been audited as `PASS`, and the formal Pilot v0.2 collection has reached
@@ -1276,12 +1288,13 @@ gate. The final overall research gate remains `OPEN / NOT DEFINED HERE`;
 C6-A interface closure is `COMPLETE / FROZEN`, with status
 `INTERFACE FEASIBLE WITH EXPLICIT PREREQUISITES`. C5-BM contract is `FROZEN`, its
 implementation is `UNIT-LEVEL PASS`, and formal materialization is `FORMAL
-COMPLETE / PASS`. Intervention-interface implementation is `NEXT / NOT STARTED /
-NOT AUTHORIZED`; C6-B policy/action relevance, transferability, and Tex3D
-optimization remain `NOT STARTED`.
+COMPLETE / PASS`. The intervention-interface contract is `FINAL AUDIT PASS /
+FROZEN`, while its implementation is `NEXT / NOT STARTED / NOT AUTHORIZED`;
+C6-B policy/action relevance, transferability, and Tex3D optimization remain
+`NOT STARTED`.
 
 ---
 
 ## 17. Current One-Line Research Summary
 
-> Linear CKA and SVCCA support a held-out-generalizing cross-VLA representation space, and C6-A confirms that O2/P2 policy-sensitivity interfaces are implementable with explicit prerequisites; next formally materialize the authoritative C5-B mapping, while policy/action relevance and Tex3D loss design remain not started.
+> Linear CKA and SVCCA support a held-out-generalizing cross-VLA representation space, the authoritative C5-B mapping is formally materialized, and the C6 O2/P2 intervention-interface contract is frozen pending separate implementation authorization; policy/action relevance and Tex3D loss design remain not started.

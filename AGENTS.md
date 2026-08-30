@@ -306,9 +306,10 @@ all `200 / 200` pairs, all four historical C5-B file identities remained unchang
 all nine mapping-array hashes verified, and all frozen historical scalar checks
 were reproduced with absolute difference `0.0`.
 
-The separate O2/P2 intervention-interface contract and implementation are the
-next prerequisite, but remain `NOT STARTED / NOT AUTHORIZED`. C6-B scientific
-analysis also remains `NOT STARTED / NOT AUTHORIZED`.
+The O2/P2 intervention-interface contract has passed final read-only audit and is
+`FROZEN`. Its implementation and unit validation remain `NOT STARTED / NOT
+AUTHORIZED` pending separate authorization. Real clean-equivalence/intervention
+smoke and C6-B scientific analysis also remain `NOT STARTED / NOT AUTHORIZED`.
 
 ### OPEN — Final Overall Research Gate and Later Stages
 
