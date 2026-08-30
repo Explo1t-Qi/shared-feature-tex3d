@@ -291,8 +291,8 @@ relevance, or transferability.
 
 ### DECISION / FACT — C5-BM Authoritative Mapping Materialization
 
-The current `task.md` is the frozen scientific and engineering authority for
-C5-BM. Its final read-only contract audit is `PASS`.
+The completed C5-BM contract remains the frozen scientific and engineering
+authority for C5-BM. Its final read-only contract audit is `PASS`.
 
 C5-BM freezes the materialization semantics for the new
 authoritative reusable `O2 ↔ P2`, 99%-PCA, true-TRAIN PCA+CCA mapping. It does not
@@ -306,11 +306,47 @@ all `200 / 200` pairs, all four historical C5-B file identities remained unchang
 all nine mapping-array hashes verified, and all frozen historical scalar checks
 were reproduced with absolute difference `0.0`.
 
-The O2/P2 intervention-interface contract has passed final read-only audit and is
-`FROZEN`. Its implementation is `UNIT-LEVEL PASS`, and unit validation is `PASS`.
-These unit-level results do not establish real-checkpoint integration. The C6 real
-clean-equivalence/intervention smoke is the next stage but remains `NOT AUTHORIZED`;
-C6-B scientific analysis also remains `NOT AUTHORIZED`.
+### DECISION / FACT — C6 Intervention-Interface and Real-Smoke Closure
+
+The O2/P2 intervention-interface contract is `FROZEN`. Its implementation is
+`UNIT-LEVEL PASS`, and unit validation is `PASS`. Subsequent separately authorized
+real-checkpoint validation established clean equivalence for OpenVLA `2 / 2` and
+pi0.5 `2 / 2` frozen observations.
+
+The original intervention-smoke results remain historical facts:
+
+```text
+OpenVLA: BLOCKED under the frozen translation-response gate
+pi0.5: PASS
+```
+
+The OpenVLA follow-up token/logit diagnostic is `PASS`. Under the same frozen
+observations, directions, and `alpha`, modified O2 measurably changed downstream
+action-token logits while greedy action-token IDs remained unchanged; decoded
+translation therefore remained unchanged. This supports a discrete
+argmax/token-boundary explanation. It validates the OpenVLA intervention path and
+downstream response, but it does not retroactively change the original smoke result
+to `PASS`.
+
+The C6 intervention-interface feasibility / intervention closure is `COMPLETE`.
+The completed outputs and provenance are:
+
+```text
+real-smoke project commit:
+eefc0e652f801c20f3de29c5d53e821dd65aa978
+
+OpenVLA diagnostic artifact/project commit:
+fffea7571fcde7922b0d0abc1a56d1e88439c011
+
+experiment_inbox/c6-real-smoke-output/
+experiment_inbox/c6-openvla-logit-diagnostic/
+```
+
+This closure establishes only real-checkpoint continuation equivalence and that
+native O2/P2 interventions enter downstream policy computation. It does not show
+that shared CCA directions are action-relevant, jointly policy-sensitive across
+models, adversarially transferable, or sufficient for a Tex3D attack. C6-B is
+`NEXT / NOT AUTHORIZED`; Tex3D optimization remains `NOT AUTHORIZED`.
 
 ### OPEN — Final Overall Research Gate and Later Stages
 
@@ -324,13 +360,12 @@ The following scientific stages remain `NOT STARTED`:
 - transferability evaluation;
 - Tex3D optimization.
 
-Do not rerun or overwrite the completed formal C5-BM materialization without a new
-explicit contract. Do not begin real C6 clean-equivalence/intervention smoke,
-formal policy/action analysis, transferability evaluation, or Tex3D optimization
-without their required explicit authorization. The next required contract is the
-separate C6 real clean-equivalence/intervention-smoke contract. Do not infer a final
+Do not rerun or overwrite the completed formal C5-BM materialization, C6 real-smoke
+artifacts, or OpenVLA diagnostic artifacts without a new explicit contract. Do not
+begin C6-B formal policy/action analysis, transferability evaluation, or Tex3D
+optimization without their required explicit authorization. Do not infer a final
 overall research PASS/FAIL from the completed representation-stage, C6-A interface
-result, or C5-BM PASS.
+result, C5-BM PASS, or C6 intervention closure.
 
 ---
 

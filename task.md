@@ -7,25 +7,39 @@ C6 intervention-interface contract: FROZEN
 C6 interface implementation: UNIT-LEVEL PASS
 C6 unit validation: PASS
 
-C6 real-smoke protocol: REVISED / PENDING FINAL READ-ONLY AUDIT
-C6 real-smoke runner implementation: AUTHORIZED
-C6 real-smoke runner unit validation: AUTHORIZED
-C6 real checkpoint execution: NOT AUTHORIZED
+C6 real-smoke runner implementation: UNIT-LEVEL PASS
+C6 real-smoke runner unit validation: PASS
+C6 real clean-equivalence: PASS (OpenVLA 2/2; pi0.5 2/2)
+C6 original intervention smoke: PARTIAL / HISTORICAL BLOCKED
+  OpenVLA: BLOCKED under the frozen translation-response gate
+  pi0.5: PASS
+C6 OpenVLA token/logit diagnostic: PASS
+C6 intervention-interface feasibility / intervention closure: COMPLETE
 
-C6-B policy-sensitivity analysis: NOT AUTHORIZED
+C6-B action-relevant shared-direction analysis: NEXT / NOT AUTHORIZED
 Tex3D optimization: NOT AUTHORIZED
 ```
 
-本阶段只授权：
+本合同冻结的 runner 已完成实现、unit validation 与后续单独授权的真实执行。
+当前状态同步只记录既有结果，不重新授权或重跑任何工作：
 
 ```text
-1. 实现真实 smoke runner
-2. 实现结果汇总工具
-3. CPU-only / static / mock-based runner tests
-4. 做 runner code audit
+real-smoke project commit:
+eefc0e652f801c20f3de29c5d53e821dd65aa978
+
+OpenVLA diagnostic artifact/project commit:
+fffea7571fcde7922b0d0abc1a56d1e88439c011
+
+formal outputs:
+experiment_inbox/c6-real-smoke-output/
+experiment_inbox/c6-openvla-logit-diagnostic/
 ```
 
-本阶段**不授权真实模型推理**。
+原始 OpenVLA intervention-smoke 的 `BLOCKED` 是冻结的历史事实，不得事后改写为
+`PASS`。后续 token/logit diagnostic 证明 modified O2 会改变 downstream
+action-token logits，但 greedy action-token IDs 保持不变，因此 decoded translation
+也保持不变；该结果支持 discrete argmax/token-boundary explanation，并解除
+intervention interface 的工程 blocker，但不建立 policy/action relevance。
 
 ------
 
@@ -692,28 +706,36 @@ STOP
 
 ------
 
-# 18. Real Execution Authorization
+# 18. Real Execution Record
 
-本合同当前仍不授权真实执行。
-
-当前状态必须保持：
-
-```text
-C6 real-smoke runner implementation: AUTHORIZED
-C6 real-smoke runner unit validation: AUTHORIZED
-
-C6 real checkpoint execution: NOT AUTHORIZED
-```
-
-只有 runner implementation + audit PASS 后，才单独授权：
+本合同最初只授权 runner implementation 与 unit audit；真实执行随后通过独立授权
+在对应服务器环境完成。当前冻结执行记录为：
 
 ```text
-OpenVLA real smoke execution
-π0.5 real smoke execution
-result aggregation
+real clean-equivalence:
+  OpenVLA: 2/2 PASS
+  pi0.5: 2/2 PASS
+
+original intervention smoke:
+  OpenVLA: BLOCKED under the frozen translation-response gate
+  pi0.5: PASS
+
+OpenVLA follow-up token/logit diagnostic:
+  PASS
 ```
 
-并由用户在对应服务器环境执行。
+诊断使用 authoritative clean-token prefix 对齐比较，确认：
+
+```text
+modified O2
+→ downstream action-token logits measurably changed
+→ greedy action-token IDs remained unchanged
+→ decoded translation therefore remained unchanged
+```
+
+因此 original OpenVLA smoke 的历史结果仍为 `BLOCKED`，但它不再代表
+intervention interface 的工程 blocker。禁止覆盖或重跑既有正式产物，除非获得新的
+明确授权。
 
 ------
 
@@ -754,20 +776,20 @@ STOP
 
 # 20. Final Stage Boundary
 
-runner audit PASS 后，下一步才是：
+当前 intervention-interface / real-smoke diagnostic 阶段正式收口：
 
 ```text
-C6 REAL EXECUTION AUTHORIZATION
+C6 intervention-interface feasibility / intervention closure: COMPLETE
+C6-B action-relevant shared-direction analysis: NEXT / NOT AUTHORIZED
+Tex3D optimization: NOT AUTHORIZED
 ```
 
-真实运行成功后才允许判定：
+该 closure 仅支持以下事实：O2/P2 continuation 在真实 checkpoint 上
+clean-equivalent；native intervention 会进入 downstream policy computation；pi0.5
+小随机 P2 intervention 产生 decoded-action response；OpenVLA 小随机 O2
+intervention 产生 action-logit response，但未跨越 greedy token boundary。
 
-```text
-C6 real clean-equivalence / intervention smoke: PASS
-```
-
-只有该状态 PASS 后，才允许起草：
-
-```text
-C6-B action-relevant shared-direction scientific contract
-```
+它不支持 shared CCA direction 已具 action relevance、两个模型具有共同 policy
+sensitivity、transferable adversarial direction 已建立或 Tex3D transferable attack
+已成立。`shared != policy-relevant != transferable`。上述问题仍属于 C6-B 及以后
+阶段，必须获得独立授权。

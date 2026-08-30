@@ -243,8 +243,13 @@ C5-BM formal materialization                FORMAL COMPLETE / PASS
 C6 intervention-interface contract         FINAL AUDIT PASS / FROZEN
 C6 intervention-interface implementation   UNIT-LEVEL PASS
 C6 intervention-interface unit validation  PASS
-C6 real clean-equivalence / intervention smoke  NEXT / NOT AUTHORIZED
-C6-B policy-sensitivity analysis            NOT STARTED / NOT AUTHORIZED
+C6 real clean-equivalence                   PASS (OpenVLA 2/2; pi0.5 2/2)
+C6 original intervention smoke              PARTIAL / HISTORICAL BLOCKED
+  OpenVLA                                   BLOCKED (translation-response gate)
+  pi0.5                                     PASS
+C6 OpenVLA token/logit diagnostic           PASS
+C6 intervention-interface closure           COMPLETE
+C6-B policy-sensitivity analysis            NEXT / NOT AUTHORIZED
 Final overall research gate                OPEN / NOT DEFINED HERE
 Policy/action relevance                    NOT STARTED
 Transferability / Tex3D optimization       NOT STARTED / NOT AUTHORIZED
@@ -299,6 +304,15 @@ policy/action relevance evidence。C5-BM scientific/engineering contract 已通�
 read-only audit 并冻结；它定义新的 authoritative mapping materialization，而不声称
 恢复历史未保存矩阵。其 implementation 已通过 unit-level validation，formal
 materialization 已完成并通过全部验证，结果为 `PASS`。
+
+C6 O2/P2 intervention interface 已在真实 checkpoint 上完成验证。OpenVLA 与
+pi0.5 的 clean-equivalence 均为 `2 / 2 PASS`。原始 intervention smoke 结果必须
+保留为：OpenVLA 在冻结的 translation-response gate 下为 `BLOCKED`，pi0.5 为
+`PASS`。后续 OpenVLA token/logit diagnostic 为 `PASS`：modified O2 会可测量地
+改变 downstream action-token logits，但 greedy action-token IDs 保持不变，因此
+decoded translation 保持不变。该结果支持 discrete argmax/token-boundary explanation，
+并完成 intervention-interface engineering closure，但不把历史 OpenVLA smoke
+改写为 `PASS`，也不构成 policy/action relevance evidence。
 
 ---
 
@@ -1120,16 +1134,58 @@ C5-BM implementation 为 `UNIT-LEVEL PASS`，formal materialization 已完成并
 C5-BM 也不定义 native intervention vector、token scope、epsilon、C6-B sensitivity
 metric 或 Tex3D loss。
 
-### DECISION — C6 O2/P2 Intervention-Interface Contract Freeze
+### DECISION / FACT — C6 O2/P2 Intervention-Interface and Real-Smoke Closure
 
-当前 `task.md` 的最终 read-only audit 已通过，C6 O2/P2
-intervention-interface contract 已冻结。合同仅定义 native O2/P2 continuation、
-reference helpers 与 unit-level clean-equivalence instrumentation。Implementation
-已达到 `UNIT-LEVEL PASS`，unit validation 为 `PASS`；这些 unit-level 结果不代表
-真实 checkpoint integration 已经验证。Real clean-equivalence/intervention smoke
-是下一阶段，但仍为 `NOT AUTHORIZED`；C6-B policy-sensitivity analysis、
-CCA-to-native direction construction 与 Tex3D optimization 均未授权。下一步必须
-单独冻结 `C6 real clean-equivalence / intervention-smoke contract`。
+C6 O2/P2 intervention-interface contract 已冻结。Implementation 已达到
+`UNIT-LEVEL PASS`，unit validation 为 `PASS`。后续独立授权的真实验证确认：
+
+```text
+real clean-equivalence:
+  OpenVLA: 2/2 PASS
+  pi0.5: 2/2 PASS
+
+original intervention smoke:
+  OpenVLA: BLOCKED under the frozen translation-response gate
+  pi0.5: PASS
+
+OpenVLA follow-up token/logit diagnostic:
+  PASS
+```
+
+OpenVLA diagnostic 使用同一冻结 observation、direction 和 `alpha`，确认：
+
+```text
+modified O2
+→ downstream action-token logits measurably changed
+→ greedy action-token IDs remained unchanged
+→ decoded translation therefore remained unchanged
+```
+
+因此 OpenVLA original intervention-smoke 的 `BLOCKED` 仍是历史事实，不得改写为
+`PASS`；但它不再代表 intervention interface 的工程 blocker。当前
+intervention-interface feasibility / intervention closure 为 `COMPLETE`。
+
+该阶段只支持 O2/P2 continuation 在真实 checkpoint 上 clean-equivalent、native
+O2/P2 intervention 会进入 downstream policy computation、pi0.5 小随机 P2
+intervention 可产生 decoded-action response，以及 OpenVLA 小随机 O2 intervention
+可产生 action-logit response但未跨越 greedy token boundary。它不支持 shared CCA
+direction 已具 action relevance、两个模型具有共同 policy sensitivity、transferable
+adversarial direction 已建立或 Tex3D transferable attack 已成立。`shared !=
+policy-relevant != transferable`。C6-B 为 `NEXT / NOT AUTHORIZED`；CCA-to-native
+direction construction 与 Tex3D optimization 均未授权。
+
+正式 provenance 与输出位置为：
+
+```text
+real-smoke project commit:
+eefc0e652f801c20f3de29c5d53e821dd65aa978
+
+OpenVLA diagnostic artifact/project commit:
+fffea7571fcde7922b0d0abc1a56d1e88439c011
+
+experiment_inbox/c6-real-smoke-output/
+experiment_inbox/c6-openvla-logit-diagnostic/
+```
 
 ---
 
@@ -1207,9 +1263,15 @@ O2/P2 intervention-interface implementation — UNIT-LEVEL PASS
         ↓
 O2/P2 intervention-interface unit validation — PASS
         ↓
-C6 real clean-equivalence / intervention smoke — NEXT / NOT AUTHORIZED
+C6 real clean-equivalence — PASS (OpenVLA 2/2; pi0.5 2/2)
         ↓
-C6-B policy-sensitivity contract and analysis — NOT STARTED / NOT AUTHORIZED
+C6 original intervention smoke — OpenVLA HISTORICAL BLOCKED; pi0.5 PASS
+        ↓
+C6 OpenVLA token/logit diagnostic — PASS
+        ↓
+C6 intervention-interface feasibility / closure — COMPLETE
+        ↓
+C6-B policy-sensitivity contract and analysis — NEXT / NOT AUTHORIZED
         ↓
 shared + action-relevant directions
         ↓
@@ -1229,8 +1291,12 @@ C5-A 的正式结果为 `GO`，C5-B / SVCCA 的正式结果为 `PASS`，因此�
 gate 得到 `C5 representation-stage PASS`。C6-A interface closure 现已完成并冻结为
 `INTERFACE FEASIBLE WITH EXPLICIT PREREQUISITES`。该结论不是 policy/action
 relevance PASS；C5-BM contract 已冻结，implementation 已达到 `UNIT-LEVEL PASS`，
-formal materialization 已正式完成并验证为 `PASS`。最终 overall research gate 仍为
-`OPEN / NOT DEFINED HERE`。
+formal materialization 已正式完成并验证为 `PASS`。真实 clean-equivalence 已在
+OpenVLA 与 pi0.5 上达到 `2 / 2 PASS`；原始 intervention smoke 保留 OpenVLA
+`BLOCKED`、pi0.5 `PASS` 的历史结果。OpenVLA follow-up token/logit diagnostic
+为 `PASS`，支持 discrete token-boundary explanation，并使 intervention-interface
+closure 达到 `COMPLETE`。这仍不是 policy/action relevance PASS。最终 overall
+research gate 仍为 `OPEN / NOT DEFINED HERE`。
 
 如果 C5-A NO-GO，应停止并重新评估当前 frozen geometry hypothesis；不得静默
 更换 C5-A metric、split、null 或 threshold。无论 C5-A 结果如何，都不能将其
@@ -1265,21 +1331,23 @@ task.md
 
 ```text
 1. pilot-v0.2-spec.md        PASS
-2. task.md                   C6 INTERFACE UNIT-LEVEL PASS
-3. AGENTS.md                 C6 INTERFACE STATUS SYNCHRONIZED
-4. research-map.md           C6 INTERFACE STATUS SYNCHRONIZED
+2. task.md                   C6 INTERVENTION CLOSURE COMPLETE
+3. AGENTS.md                 C6 INTERVENTION STATUS SYNCHRONIZED
+4. research-map.md           C6 INTERVENTION STATUS SYNCHRONIZED
 ```
 
 Pilot v0.1 remains historical and unchanged.
 
 `AGENTS.md` distinguishes v0.1 and v0.2 routing and preserves the completed C5-A,
-C5-B, representation-stage, and C6-A interface-closure records. The current
-`task.md` is the frozen C6 O2/P2 intervention-interface implementation contract.
-Its final read-only audit has passed, implementation is `UNIT-LEVEL PASS`, and unit
-validation is `PASS`. These unit-level results do not validate real-checkpoint
-integration. Real clean-equivalence/intervention smoke is `NEXT / NOT AUTHORIZED`,
-and formal policy/action experiments remain not authorized pending their respective
-explicit authorizations.
+C5-B, representation-stage, C6-A interface-closure, C5-BM, and C6 intervention
+records. The current `task.md` preserves the frozen C6 real-smoke contract and its
+execution record. The intervention interface implementation is `UNIT-LEVEL PASS`,
+unit validation is `PASS`, and real clean-equivalence is `PASS` for OpenVLA `2 / 2`
+and pi0.5 `2 / 2`. The original intervention smoke remains OpenVLA `BLOCKED` under
+the frozen translation gate and pi0.5 `PASS`; the follow-up OpenVLA token/logit
+diagnostic is `PASS`, resolving the interface engineering blocker without rewriting
+the historical smoke result. Formal C6-B policy/action experiments remain
+`NOT AUTHORIZED`.
 
 The C5-D0 collector has reached `UNIT-LEVEL PASS`, its reduced real integration
 smoke has been audited as `PASS`, and the formal Pilot v0.2 collection has reached
@@ -1300,12 +1368,14 @@ C6-A interface closure is `COMPLETE / FROZEN`, with status
 implementation is `UNIT-LEVEL PASS`, and formal materialization is `FORMAL
 COMPLETE / PASS`. The intervention-interface contract is `FINAL AUDIT PASS /
 FROZEN`, its implementation is `UNIT-LEVEL PASS`, and unit validation is `PASS`.
-The separate real clean-equivalence/intervention smoke is the next required contract
-and remains `NOT AUTHORIZED`; C6-B policy/action relevance, transferability, and
-Tex3D optimization remain `NOT STARTED / NOT AUTHORIZED`.
+Real clean-equivalence is complete and passed for both model interfaces. The
+original intervention-smoke split result and subsequent OpenVLA diagnostic are
+preserved separately, and intervention-interface closure is `COMPLETE`. C6-B is
+`NEXT / NOT AUTHORIZED`; policy/action relevance, transferability, and Tex3D
+optimization remain `NOT STARTED / NOT AUTHORIZED`.
 
 ---
 
 ## 17. Current One-Line Research Summary
 
-> Linear CKA and SVCCA support a held-out-generalizing cross-VLA representation space, the authoritative C5-B mapping is formally materialized, and the frozen C6 O2/P2 intervention interface has passed unit-level validation pending a separately contracted real-checkpoint smoke; policy/action relevance and Tex3D loss design remain not started.
+> Linear CKA and SVCCA support a held-out-generalizing cross-VLA representation space, the authoritative C5-B mapping is formally materialized, and the C6 O2/P2 intervention-interface closure is complete after real clean-equivalence and an OpenVLA token/logit diagnostic preserved the original smoke result while resolving its engineering blocker; policy/action relevance and Tex3D loss design remain not started.
