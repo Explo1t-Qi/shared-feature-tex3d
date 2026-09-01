@@ -185,6 +185,39 @@ Paired cross-model features must preserve the same frozen raw observation identi
 
 Frozen statistical, sampling, grouping, split, CKA, SVCCA, and null-design decisions must not be replaced with alternatives without explicit scientific approval.
 
+### DECISION — Vulnerability-First Main Route
+
+The current default scientific route is vulnerability-first:
+
+1. independently identify model-specific adversarial/action-relevant vulnerable
+   features within each VLA;
+2. only then analyze cross-model alignment or fusion of those vulnerable
+   structures;
+3. use any supported shared vulnerable structure to design a future
+   single-surrogate attack loss;
+4. evaluate transfer only on held-out VLA models.
+
+The previous clean-shared-first route (`clean CCA → action-relevant shared
+direction → attack`) is retained as complementary analysis, ablation, and a
+possible alternative route. It is deferred from the default main line, not rejected
+or classified as a failed route.
+
+Multi-model clean/adversarial representation analysis is allowed during discovery.
+Future formal texture optimization must remain single-surrogate and must not become
+an ensemble objective such as `L_OpenVLA + L_pi0.5`.
+
+Completed C5/C5-BM results remain evidence that heterogeneous VLA representations
+contain stable alignable clean shared structure. Completed C6 intervention closure
+remains engineering evidence that native O2/P2 features can be explicitly
+intervened and propagated downstream. Neither establishes vulnerable features,
+shared vulnerability, policy relevance, transferability, or a Tex3D attack.
+Maintain the boundary `shared != vulnerable != policy-relevant != transferable`.
+
+The next vulnerability-first cross-model feature study is `NOT YET CONTRACTED /
+NOT AUTHORIZED`. Do not implement vulnerability discovery, adversarial feature
+extraction, cross-model vulnerable-feature fusion, or any attack loss without a new
+explicit contract.
+
 ---
 
 ## Current Research Decisions and OPEN Blockers
@@ -346,7 +379,10 @@ This closure establishes only real-checkpoint continuation equivalence and that
 native O2/P2 interventions enter downstream policy computation. It does not show
 that shared CCA directions are action-relevant, jointly policy-sensitive across
 models, adversarially transferable, or sufficient for a Tex3D attack. C6-B is
-`NEXT / NOT AUTHORIZED`; Tex3D optimization remains `NOT AUTHORIZED`.
+`DEFERRED / RETAINED AS COMPLEMENTARY ROUTE` and remains unauthorized. The next
+default scientific stage is the vulnerability-first cross-model feature study,
+which is `NOT YET CONTRACTED / NOT AUTHORIZED`; Tex3D optimization remains
+`NOT AUTHORIZED`.
 
 ### OPEN — Final Overall Research Gate and Later Stages
 
@@ -363,9 +399,11 @@ The following scientific stages remain `NOT STARTED`:
 Do not rerun or overwrite the completed formal C5-BM materialization, C6 real-smoke
 artifacts, or OpenVLA diagnostic artifacts without a new explicit contract. Do not
 begin C6-B formal policy/action analysis, transferability evaluation, or Tex3D
-optimization without their required explicit authorization. Do not infer a final
-overall research PASS/FAIL from the completed representation-stage, C6-A interface
-result, C5-BM PASS, or C6 intervention closure.
+optimization without their required explicit authorization. Do not begin
+vulnerability discovery, adversarial feature extraction, or cross-model vulnerable
+feature alignment/fusion without a new contract. Do not infer a final overall
+research PASS/FAIL from the completed representation-stage, C6-A interface result,
+C5-BM PASS, or C6 intervention closure.
 
 ---
 

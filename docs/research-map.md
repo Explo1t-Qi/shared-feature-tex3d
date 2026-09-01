@@ -8,32 +8,40 @@
 
 当前核心假设是：
 
-> 不同 VLA 架构在视觉到动作决策的数据流中，可能存在稳定的 cross-model shared representation structure。若进一步找到其中与 policy/action 相关的 shared directions，并在单一 surrogate 上针对这些方向优化 adversarial texture，则可能提高跨架构迁移性。
+> 不同 VLA 架构不仅可能存在稳定的 clean shared representation structure，也可能
+> 存在跨模型共同的 adversarially vulnerable / action-relevant structure。本项目优先
+> 在各模型内部独立识别真正容易被攻击且与动作相关的 features/directions，再研究这些
+> vulnerable structures 能否在异构 VLA 之间对齐或融合，最终用于提高
+> single-surrogate adversarial texture 的迁移性。
 
 必须严格区分：
 
 \[
 \text{shared}
 \neq
-\text{transferable}
+\text{vulnerable}
 \neq
-\text{policy-relevant}.
+\text{policy-relevant}
+\neq
+\text{transferable}.
 \]
 
-因此，representation similarity 只是研究链路的第一步，不能直接作为攻击迁移性或策略相关性的证据。
+因此，clean representation similarity 只提供前置 representation evidence，不能直接
+作为 vulnerability、策略相关性或攻击迁移性的证据。
 
 ---
 
 ## 2. Threat Model
 
-### DECISION — Shared-Feature Discovery + Single-Surrogate Attack
+### DECISION — Vulnerable-Feature Discovery + Single-Surrogate Attack
 
 Representation discovery 阶段允许同时分析多个 VLA，例如：
 
 - OpenVLA；
 - \(\pi_{0.5}\)。
 
-允许使用两边的 paired clean representations 学习或分析 shared structure。
+允许使用多个模型的 clean/adversarial representations 做 discovery、对齐和融合分析，
+包括使用 paired clean representations 分析 shared structure。
 
 但是正式 adversarial texture optimization 必须保持：
 
@@ -46,14 +54,15 @@ single surrogate only
 \[
 x_{\mathrm{adv}}
 \rightarrow
-Z_A(x_{\mathrm{adv}})
+Z^{\mathrm{vuln}}_A(x_{\mathrm{adv}})
 \rightarrow
-W_A
+\mathcal{L}_{\mathrm{vulnerable-surrogate}}
 \rightarrow
-H_A(x_{\mathrm{adv}})
-\rightarrow
-\mathcal{L}_{\mathrm{shared-policy}}.
+\theta_{\mathrm{texture}}.
 \]
+
+该式只冻结 single-surrogate boundary；具体 vulnerable representation 和 loss 尚未
+contracted 或 authorized。
 
 攻击阶段不得退化为：
 
@@ -79,23 +88,35 @@ UPA-RFAS 等工作提供了不同 VLA feature spaces 之间可能存在共享结
 
 本项目不把“观察到 cross-model correlation”直接等价为“已经得到 transferable attack space”。
 
-研究路线显式拆分为：
+当前默认 scientific route 冻结为 vulnerability-first：
 
 ```text
-cross-model representation similarity
+model-specific vulnerability discovery
         ↓
-explicit shared-space alignment
+action-relevant vulnerable feature identification
         ↓
-policy/action relevance
+cross-model vulnerable feature alignment / fusion
         ↓
-shared + action-relevant representation
+shared vulnerable representation
         ↓
-single-surrogate shared-feature loss
+single-surrogate vulnerable-feature loss
         ↓
 Tex3D texture optimization
         ↓
 held-out VLA transfer evaluation
 ```
+
+此前的 clean-shared-first 路线：
+
+```text
+clean cross-model shared space / CCA
+→ action-relevant shared directions
+→ attack
+```
+
+不被否定或删除。它保留为 complementary analysis、ablation 和 possible alternative
+route。已经完成的 clean cross-model CKA/CCA 结果继续作为稳定、可对齐 shared
+structure 的前置证据，但不再作为当前默认攻击研究主线。
 
 ---
 
@@ -249,7 +270,8 @@ C6 original intervention smoke              PARTIAL / HISTORICAL BLOCKED
   pi0.5                                     PASS
 C6 OpenVLA token/logit diagnostic           PASS
 C6 intervention-interface closure           COMPLETE
-C6-B policy-sensitivity analysis            NEXT / NOT AUTHORIZED
+Previous C6-B clean-shared-direction plan   DEFERRED / COMPLEMENTARY / NOT AUTHORIZED
+Vulnerability-first cross-model study       NEXT / NOT CONTRACTED / NOT AUTHORIZED
 Final overall research gate                OPEN / NOT DEFINED HERE
 Policy/action relevance                    NOT STARTED
 Transferability / Tex3D optimization       NOT STARTED / NOT AUTHORIZED
@@ -313,6 +335,13 @@ pi0.5 的 clean-equivalence 均为 `2 / 2 PASS`。原始 intervention smoke 结�
 decoded translation 保持不变。该结果支持 discrete argmax/token-boundary explanation，
 并完成 intervention-interface engineering closure，但不把历史 OpenVLA smoke
 改写为 `PASS`，也不构成 policy/action relevance evidence。
+
+这些 C5/C6 结果现在定位为两类既有基础证据：异构 VLA representations 中存在稳定、
+可对齐的 clean shared structure；native O2/P2 features 可被显式介入并传播到
+downstream computation。它们不直接证明 vulnerability 或 transferability。下一默认
+主线是尚未 contracted/authorized 的 vulnerability-first cross-model feature study；
+原 C6-B clean-shared-direction 计划保留为 complementary analysis / ablation，而非
+失败路线。
 
 ---
 
@@ -1061,7 +1090,32 @@ O2   ↔ P2 positive
 
 ---
 
-## 13. Policy / Action Relevance — Next Stage
+## 13. Vulnerability-First Cross-Model Study — Next Scientific Stage
+
+### DECISION — Vulnerability-First Main Route
+
+当前默认 scientific route 是：
+
+1. 分别在每个 VLA 内识别 model-specific adversarial/action-relevant vulnerable
+   features 或 directions；
+2. 只在这些 model-specific vulnerability 已被支持后，分析其跨模型 alignment 或
+   fusion；
+3. 使用得到的 shared vulnerable structure 设计未来的 single-surrogate attack loss；
+4. 最后仅在 held-out VLA 上评估 transferability。
+
+该 next stage 当前为 `NOT YET CONTRACTED / NOT AUTHORIZED`。尚未证明：
+
+```text
+model-specific vulnerable features 已找到
+cross-model vulnerable structure 已存在
+shared vulnerable direction 已确定
+transferability 已提高
+Tex3D attack 已建立
+```
+
+当前已知的只是 clean shared representation structure 存在，以及 native O2/P2
+feature intervention path 可用。`shared != vulnerable != policy-relevant !=
+transferable`。
 
 ### DECISION / FACT — C6-A Interface Closure
 
@@ -1087,7 +1141,7 @@ C6-A 冻结了以下 stage boundary：
 上述结论只完成 interface closure，不证明 policy relevance、causal relevance、
 action relevance 或 transferability。
 
-### OPEN — C6-B Policy / Action Relevance
+### OPEN — Previous C6-B Clean-Shared-Direction Route (Complementary)
 
 C5 不负责证明：
 
@@ -1095,7 +1149,7 @@ C5 不负责证明：
 policy relevance
 ```
 
-如果 C5 得到 candidate shared space，下一阶段需要进一步寻找：
+原 clean-shared-first 路线会从 candidate shared space 进一步寻找：
 
 \[
 S_{\mathrm{target}}
@@ -1105,8 +1159,10 @@ S_{\mathrm{shared}}
 S_{\mathrm{action-relevant}}.
 \]
 
-当前尚未冻结 C6-B 的最终 sensitivity metric、native intervention vector、token
-scope、perturbation scale、candidate-selection rule 或 statistical threshold。
+该路线现为 `DEFERRED / RETAINED AS COMPLEMENTARY ROUTE`，用于 complementary
+analysis、ablation 或 possible alternative route；它不是失败路线。其最终
+sensitivity metric、native intervention vector、token scope、perturbation scale、
+candidate-selection rule 或 statistical threshold 仍未冻结。
 
 候选方向包括但不限于：
 
@@ -1115,8 +1171,8 @@ scope、perturbation scale、candidate-selection rule 或 statistical threshold�
 - intervention；
 - action prediction。
 
-在独立 intervention-interface prerequisite 完成、且 C6-B 方法正式讨论和冻结之前，
-不应提前选定其中任意一种。
+在该 complementary C6-B 方法被单独讨论、冻结和授权之前，不应提前选定其中任意
+一种，也不得把它重新视为默认主线。
 
 ### DECISION / FACT — C5-BM Authoritative Mapping Materialization
 
@@ -1171,8 +1227,10 @@ intervention 可产生 decoded-action response，以及 OpenVLA 小随机 O2 int
 可产生 action-logit response但未跨越 greedy token boundary。它不支持 shared CCA
 direction 已具 action relevance、两个模型具有共同 policy sensitivity、transferable
 adversarial direction 已建立或 Tex3D transferable attack 已成立。`shared !=
-policy-relevant != transferable`。C6-B 为 `NEXT / NOT AUTHORIZED`；CCA-to-native
-direction construction 与 Tex3D optimization 均未授权。
+vulnerable != policy-relevant != transferable`。原 C6-B clean-shared-direction 计划为
+`DEFERRED / COMPLEMENTARY ROUTE`；当前 vulnerability-first next stage 尚未
+contracted/authorized，CCA-to-native direction construction 与 Tex3D optimization
+均未授权。
 
 正式 provenance 与输出位置为：
 
@@ -1189,13 +1247,15 @@ experiment_inbox/c6-openvla-logit-diagnostic/
 
 ---
 
-## 14. Shared-Feature Attack Stage
+## 14. Vulnerable-Feature Attack Stage
 
 ### DECISION — Discovery and Attack Remain Separate
 
-Representation discovery 可以使用 OpenVLA 与 \(\pi_{0.5}\) 的 paired clean features。
+Representation discovery 可以使用 OpenVLA 与 \(\pi_{0.5}\) 的 model-specific
+clean/adversarial features，并可在 discovery 阶段分析跨模型 vulnerable-structure
+alignment/fusion。
 
-正式攻击阶段只使用 surrogate-side frozen mapping。
+未来正式攻击阶段必须只使用 surrogate-side frozen vulnerable/shared structure。
 
 例如：
 
@@ -1206,10 +1266,13 @@ Z_A(x_{\mathrm{adv}})
 \rightarrow
 H_A(x_{\mathrm{adv}})
 \rightarrow
-\mathcal{L}_{\mathrm{shared-policy}}
+\mathcal{L}_{\mathrm{vulnerable-shared}}
 \rightarrow
 \theta_{\mathrm{texture}}.
 \]
+
+该式仅表示 single-surrogate threat-model boundary；具体 vulnerable feature、mapping
+与 loss 尚未确定或授权。
 
 Held-out VLA 不提供：
 
@@ -1271,11 +1334,15 @@ C6 OpenVLA token/logit diagnostic — PASS
         ↓
 C6 intervention-interface feasibility / closure — COMPLETE
         ↓
-C6-B policy-sensitivity contract and analysis — NEXT / NOT AUTHORIZED
+model-specific vulnerability discovery — NEXT / NOT CONTRACTED / NOT AUTHORIZED
         ↓
-shared + action-relevant directions
+action-relevant vulnerable feature identification
         ↓
-single-surrogate shared-feature Tex3D loss
+cross-model vulnerable feature alignment / fusion
+        ↓
+shared vulnerable representation
+        ↓
+single-surrogate vulnerable-feature Tex3D loss
         ↓
 Tex3D texture optimization
         ↓
@@ -1297,6 +1364,12 @@ OpenVLA 与 pi0.5 上达到 `2 / 2 PASS`；原始 intervention smoke 保留 Open
 为 `PASS`，支持 discrete token-boundary explanation，并使 intervention-interface
 closure 达到 `COMPLETE`。这仍不是 policy/action relevance PASS。最终 overall
 research gate 仍为 `OPEN / NOT DEFINED HERE`。
+
+该图在 C6 closure 后展示的是新的 vulnerability-first 默认路线。原
+clean-shared-first 路线（clean CCA → action-relevant shared direction → attack）
+仍完整保留为 complementary analysis / ablation / possible alternative route，不是
+失败路线。C5-A、C5-B 与 C5-BM 的历史 pipeline 和结果仍是 clean shared structure
+稳定且可对齐的正式证据。
 
 如果 C5-A NO-GO，应停止并重新评估当前 frozen geometry hypothesis；不得静默
 更换 C5-A metric、split、null 或 threshold。无论 C5-A 结果如何，都不能将其
@@ -1347,7 +1420,9 @@ and pi0.5 `2 / 2`. The original intervention smoke remains OpenVLA `BLOCKED` und
 the frozen translation gate and pi0.5 `PASS`; the follow-up OpenVLA token/logit
 diagnostic is `PASS`, resolving the interface engineering blocker without rewriting
 the historical smoke result. Formal C6-B policy/action experiments remain
-`NOT AUTHORIZED`.
+`DEFERRED / RETAINED AS COMPLEMENTARY ROUTE` and are not authorized. The next
+default scientific stage is the vulnerability-first cross-model feature study,
+which is `NOT YET CONTRACTED / NOT AUTHORIZED`.
 
 The C5-D0 collector has reached `UNIT-LEVEL PASS`, its reduced real integration
 smoke has been audited as `PASS`, and the formal Pilot v0.2 collection has reached
@@ -1371,11 +1446,13 @@ FROZEN`, its implementation is `UNIT-LEVEL PASS`, and unit validation is `PASS`.
 Real clean-equivalence is complete and passed for both model interfaces. The
 original intervention-smoke split result and subsequent OpenVLA diagnostic are
 preserved separately, and intervention-interface closure is `COMPLETE`. C6-B is
-`NEXT / NOT AUTHORIZED`; policy/action relevance, transferability, and Tex3D
-optimization remain `NOT STARTED / NOT AUTHORIZED`.
+`DEFERRED / COMPLEMENTARY ROUTE`; the vulnerability-first cross-model study is
+`NEXT / NOT CONTRACTED / NOT AUTHORIZED`. Model-specific vulnerability discovery,
+policy/action relevance, transferability, and Tex3D optimization remain
+`NOT STARTED / NOT AUTHORIZED`.
 
 ---
 
 ## 17. Current One-Line Research Summary
 
-> Linear CKA and SVCCA support a held-out-generalizing cross-VLA representation space, the authoritative C5-B mapping is formally materialized, and the C6 O2/P2 intervention-interface closure is complete after real clean-equivalence and an OpenVLA token/logit diagnostic preserved the original smoke result while resolving its engineering blocker; policy/action relevance and Tex3D loss design remain not started.
+> Linear CKA and SVCCA establish clean alignable cross-VLA representation evidence, and the C6 O2/P2 intervention-interface closure establishes downstream intervention feasibility; the next default route is model-specific vulnerability/action-relevance discovery followed by cross-model vulnerable-structure alignment, while clean-shared-first analysis remains a complementary route and no vulnerability, transferability, or Tex3D attack conclusion has yet been established.

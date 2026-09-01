@@ -16,7 +16,9 @@ C6 original intervention smoke: PARTIAL / HISTORICAL BLOCKED
 C6 OpenVLA token/logit diagnostic: PASS
 C6 intervention-interface feasibility / intervention closure: COMPLETE
 
-C6-B action-relevant shared-direction analysis: NEXT / NOT AUTHORIZED
+Previous C6-B clean-shared-direction plan: DEFERRED / COMPLEMENTARY ROUTE / NOT AUTHORIZED
+Next scientific stage: VULNERABILITY-FIRST CROSS-MODEL FEATURE STUDY
+  NOT YET CONTRACTED / NOT AUTHORIZED
 Tex3D optimization: NOT AUTHORIZED
 ```
 
@@ -780,7 +782,9 @@ STOP
 
 ```text
 C6 intervention-interface feasibility / intervention closure: COMPLETE
-C6-B action-relevant shared-direction analysis: NEXT / NOT AUTHORIZED
+Previous C6-B clean-shared-direction plan: DEFERRED / COMPLEMENTARY ROUTE / NOT AUTHORIZED
+Next scientific stage: VULNERABILITY-FIRST CROSS-MODEL FEATURE STUDY
+  NOT YET CONTRACTED / NOT AUTHORIZED
 Tex3D optimization: NOT AUTHORIZED
 ```
 
@@ -789,7 +793,12 @@ clean-equivalent；native intervention 会进入 downstream policy computation�
 小随机 P2 intervention 产生 decoded-action response；OpenVLA 小随机 O2
 intervention 产生 action-logit response，但未跨越 greedy token boundary。
 
-它不支持 shared CCA direction 已具 action relevance、两个模型具有共同 policy
-sensitivity、transferable adversarial direction 已建立或 Tex3D transferable attack
-已成立。`shared != policy-relevant != transferable`。上述问题仍属于 C6-B 及以后
-阶段，必须获得独立授权。
+它不支持 model-specific vulnerable features 已找到、cross-model vulnerable
+structure 已存在、shared vulnerable direction 已确定、transferability 已提高或
+Tex3D attack 已建立。`shared != vulnerable != policy-relevant != transferable`。
+
+当前默认 next route 调整为：先分别发现各模型的 adversarial/action-relevant
+vulnerable features，再研究其跨模型 alignment/fusion。原 C6-B
+clean-shared-direction 路线未被否定，保留为 complementary analysis、ablation 和
+possible alternative route。两条路线均须获得新的独立 contract；本历史 task 不授权
+其中任何实现。
