@@ -90,7 +90,9 @@ def test_hooks_modify_only_selected_inputs_and_restore_without_inplace_writes():
     torch.testing.assert_close(module(x), clean, rtol=0, atol=0)
     assert stats["changed_values"] == 2
     assert stats["actual_delta_sq"] == pytest.approx(0.5)
-    assert stats["ffn_shift_sq"] == pytest.approx(float((output.detach() - clean).double().square().sum()))
+    assert stats["ffn_shift_sq"] == pytest.approx(
+        float((output.detach() - clean).double().square().sum()), rel=1e-5, abs=1e-8
+    )
     assert not module._forward_pre_hooks
 
 

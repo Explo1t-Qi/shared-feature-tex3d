@@ -440,10 +440,32 @@ def _load_preprocessing_runtime() -> _PreprocessingRuntime:
     try:
         import tensorflow as tf
         from experiments.robot.libero.libero_utils import get_libero_image
-        from experiments.robot.openvla_utils import (
-            OPENVLA_V01_SYSTEM_PROMPT,
-            crop_and_resize,
-        )
+        from experiments.robot.openvla_utils import OPENVLA_V01_SYSTEM_PROMPT
+        try:
+            from experiments.robot.openvla_utils import crop_and_resize
+        except ImportError:
+            # Tex3D commit 1aab9b0 moved this helper out of openvla_utils while
+            # preserving the historical TensorFlow preprocessing contract.
+            from experiments.robot.openvla_policy_view import (
+                POLICY_PRE_CROP_RESOLUTION,
+            )
+
+            def crop_and_resize(image: Any, crop_scale: float, batch_size: int) -> Any:
+                if image.shape.ndims == 3:
+                    image = tf.expand_dims(image, axis=0)
+                    squeeze = True
+                elif image.shape.ndims == 4:
+                    squeeze = False
+                else:
+                    raise ValueError("image must be a 3D or 4D TensorFlow tensor")
+                side = tf.reshape(tf.clip_by_value(tf.sqrt(crop_scale), 0.0, 1.0), (batch_size,))
+                offset = (1.0 - side) / 2.0
+                boxes = tf.stack((offset, offset, offset + side, offset + side), axis=1)
+                result = tf.image.crop_and_resize(
+                    image, boxes, tf.range(batch_size),
+                    (POLICY_PRE_CROP_RESOLUTION, POLICY_PRE_CROP_RESOLUTION),
+                )
+                return result[0] if squeeze else result
         from PIL import Image
     except ImportError as error:
         raise OpenVLAFeatureExtractionError(

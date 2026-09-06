@@ -165,3 +165,6 @@ Bash 成功后创建同名 `.review.tar.gz`，包含小型审阅证据；完整 
 - 服务器首次运行暴露的包引用问题已定位并修复：Tex3D 的
   `openvla_utils.py` 使用 top-level sibling import，pilot 现在会在 preflight
   和 runtime 加载前加入并检查 `openvla/experiments/robot`。
+- 后续服务器运行发现 Tex3D `1aab9b0` 已将 `crop_and_resize` 从
+  `openvla_utils.py` 移至 `openvla_policy_view.py`；共享预处理加载器现兼容旧函数
+  与新目录布局，未修改 checkpoint 或 Tex3D checkout。
