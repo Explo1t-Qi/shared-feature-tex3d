@@ -2,6 +2,11 @@
 
 ## Current Authorized UP Pilot
 
+The user subsequently authorized the action-relevant screening extension. Its
+current contract is `docs/up-action-relevant-pilot.md`: screen on the original
+calibration groups, freeze the selection, validate on independent new groups.
+This includes CPU checks and server entrypoints, not new collection or rollout.
+
 The user authorized the single-concept OpenVLA `up` pilot on 2026-09-05 and
 resumed implementation on 2026-09-06. For this bounded task, read
 `docs/up-concept-pilot.md`; historical `task.md` remains the completed C6 contract.

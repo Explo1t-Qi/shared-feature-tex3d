@@ -1,6 +1,8 @@
 # UP 单概念干预 pilot v1
 
-状态：实现与 CPU 验证完成；尚未运行真实 checkpoint，尚无行为结论。
+状态：v1 真实 checkpoint 运行已完成（`b8a330f7d27b`），UP decoded action 未变化。
+后续已授权 [action-relevant 筛选扩展](up-action-relevant-pilot.md)。
+下文原始协议及当时的验证记录保留历史语义。
 
 ## 授权与范围
 

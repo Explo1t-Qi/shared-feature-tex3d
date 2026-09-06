@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# bash scripts/up_action_server_run.sh FULL_SHA screen|validate [--preflight-only|--run]
+set -euo pipefail
+EXPECTED_HEAD="${1:?Pass full committed project SHA}"
+STAGE="${2:?Pass screen or validate}"
+MODE="${3:---preflight-only}"
+[[ "$EXPECTED_HEAD" =~ ^[0-9a-f]{40}$ ]] || { echo 'Expected a full SHA' >&2; exit 2; }
+case "$STAGE" in screen|validate) ;; *) echo 'Invalid stage' >&2; exit 2 ;; esac
+case "$MODE" in --preflight-only|--run) ;; *) echo 'Invalid mode' >&2; exit 2 ;; esac
+UP_REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+OPENVLA_PY="${OPENVLA_PY:-/home/xiaomengqi/miniconda3/envs/tex3d-openvla/bin/python}"
+TEX3D_ROOT="${TEX3D_ROOT:-/data/xiaomengqi/src/tex3d-fixed}"
+OPENVLA_CKPT="${OPENVLA_CKPT:-/data/huangsimin/openvla-7b-finetuned-libero-spatial}"
+COLLECTION_MANIFEST="${COLLECTION_MANIFEST:-$UP_REPO/experiment_inbox/c5_d0_pilot_v02_full_collection/collection_manifest.json}"
+UP_V1_DIR="${UP_V1_DIR:-/data/xiaomengqi/logs/up-concept/up-concept-v1-b8a330f7d27b}"
+UP_OUTPUT_ROOT="${UP_OUTPUT_ROOT:-/data/xiaomengqi/logs/up-concept}"
+UP_RUN_ID="${UP_RUN_ID:-up-action-$STAGE-${EXPECTED_HEAD:0:12}}"
+[[ "$UP_RUN_ID" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { echo 'Invalid run ID' >&2; exit 2; }
+UP_RUN_DIR="$UP_OUTPUT_ROOT/$UP_RUN_ID"
+[[ -x "$OPENVLA_PY" ]] || { echo "Python missing: $OPENVLA_PY" >&2; exit 1; }
+[[ ! -e "$UP_RUN_DIR" ]] || { echo "Refusing existing output: $UP_RUN_DIR" >&2; exit 1; }
+[[ "$(git -C "$UP_REPO" rev-parse HEAD)" == "$EXPECTED_HEAD" ]] || { echo 'HEAD mismatch' >&2; exit 1; }
+git -C "$UP_REPO" diff --exit-code HEAD -- >/dev/null
+for up_file in scripts/up_action_screen.py shared_feature/up_action_screen.py scripts/up_action_server_run.sh; do
+    git -C "$UP_REPO" ls-files --error-unmatch "$up_file" >/dev/null
+done
+export PYTHONPATH="$UP_REPO:$TEX3D_ROOT/openvla:$TEX3D_ROOT/openvla/experiments/robot"
+export PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+export TOKENIZERS_PARALLELISM=false CUDA_DEVICE_ORDER=PCI_BUS_ID TF_CPP_MIN_LOG_LEVEL=3
+export MUJOCO_GL=egl PYOPENGL_PLATFORM=egl
+ARGS=("$STAGE" --collection-manifest "$COLLECTION_MANIFEST" --pretrained-checkpoint "$OPENVLA_CKPT"
+      --tex3d-openvla-root "$TEX3D_ROOT/openvla" --output-dir "$UP_RUN_DIR"
+      --expected-head "$EXPECTED_HEAD" --v1-dir "$UP_V1_DIR")
+if [[ "$STAGE" == validate ]]; then
+    : "${UP_SELECTION_DIR:?Set UP_SELECTION_DIR to the completed frozen screen directory}"
+    : "${UP_VALIDATION_MANIFEST:?Set UP_VALIDATION_MANIFEST to the independent observation manifest}"
+    ARGS+=(--selection-dir "$UP_SELECTION_DIR" --validation-manifest "$UP_VALIDATION_MANIFEST")
+fi
+CUDA_VISIBLE_DEVICES='' "$OPENVLA_PY" "$UP_REPO/scripts/up_action_screen.py" "${ARGS[@]}" --preflight-only
+[[ "$MODE" == --run ]] || exit 0
+: "${GPU_ID:?Set one currently available physical GPU}"
+[[ "$GPU_ID" =~ ^[0-9]+$ ]] || { echo 'GPU_ID must be numeric' >&2; exit 2; }
+mkdir -p -- "$UP_OUTPUT_ROOT"
+UP_CONSOLE=$(mktemp "$UP_OUTPUT_ROOT/$UP_RUN_ID.console.XXXXXX.log")
+exec > >(tee "$UP_CONSOLE") 2>&1
+trap 'echo "FAILED at line $LINENO; retain $UP_CONSOLE" >&2' ERR
+printf 'STAGE=%s\nGPU=%s\nHEAD=%s\nOUTPUT=%s\n' "$STAGE" "$GPU_ID" "$EXPECTED_HEAD" "$UP_RUN_DIR"
+CUDA_VISIBLE_DEVICES='' "$OPENVLA_PY" -m pytest -q -p no:cacheprovider "$UP_REPO/tests/test_up_action_screen.py"
+CUDA_VISIBLE_DEVICES="$GPU_ID" "$OPENVLA_PY" "$UP_REPO/scripts/up_action_screen.py" "${ARGS[@]}"
+test -f "$UP_RUN_DIR/results.json"
+test ! -e "$UP_RUN_DIR/failure.json"
+UP_BUNDLE="$UP_RUN_DIR.review.tar.gz"
+test ! -e "$UP_BUNDLE"
+# NPZ 留服务器；保留小型 JSON 证据，无论筛选是否足够十个都能审阅。
+tar --exclude='./screen_logits' --exclude='./logits' -czf "$UP_BUNDLE" -C "$UP_RUN_DIR" .
+printf 'STAGE FINISHED. Review selection_status before validation: %s\n' "$UP_BUNDLE"

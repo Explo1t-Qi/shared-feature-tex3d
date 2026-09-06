@@ -1,8 +1,8 @@
 # Shared-Feature Tex3D Research Map
 
-> 2026-09-06 current bounded implementation: [UP 单概念 pilot](up-concept-pilot.md)
-> 已获用户授权，已完成 OpenVLA Spatial 候选提取与冻结 observation FFN 干预实现及 CPU 验证。
-> 尚无真实模型运行结果，不代表 broad cross-model study、rollout 或纹理训练放行。
+> Current bounded implementation: [UP action-relevant 筛选](up-action-relevant-pilot.md)。
+> 前序 UP v1 真实模型运行完成，词汇 Top-10 未改变 decoded action tokens。
+> 新筛选与独立验证入口已授权并完成 CPU 验证，尚未执行本轮服务器实验。
 > 以下 C5/C6 与默认研究路线记录保持历史语义；UP pilot 是新的独立协议。
 
 ## 1. Research Goal
