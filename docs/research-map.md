@@ -1,5 +1,10 @@
 # Shared-Feature Tex3D Research Map
 
+> 2026-09-06 current bounded implementation: [UP 单概念 pilot](up-concept-pilot.md)
+> 已获用户授权，已完成 OpenVLA Spatial 候选提取与冻结 observation FFN 干预实现及 CPU 验证。
+> 尚无真实模型运行结果，不代表 broad cross-model study、rollout 或纹理训练放行。
+> 以下 C5/C6 与默认研究路线记录保持历史语义；UP pilot 是新的独立协议。
+
 ## 1. Research Goal
 
 当前研究目标是提升 Tex3D adversarial 3D texture 在不同架构 Vision-Language-Action (VLA) 模型之间的迁移性。

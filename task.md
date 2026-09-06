@@ -1,5 +1,9 @@
 # C6 Real Clean-Equivalence / Intervention-Smoke Runner Contract
 
+> Historical completed contract. The separately authorized 2026-09-05/06 UP
+> single-concept pilot is specified in [docs/up-concept-pilot.md](docs/up-concept-pilot.md).
+> Its authorization does not rerun or amend the C6 scientific protocol below.
+
 ## 1. Current Status
 
 ```text

@@ -1,5 +1,16 @@
 # AGENTS.md
 
+## Current Authorized UP Pilot
+
+The user authorized the single-concept OpenVLA `up` pilot on 2026-09-05 and
+resumed implementation on 2026-09-06. For this bounded task, read
+`docs/up-concept-pilot.md`; historical `task.md` remains the completed C6 contract.
+This new authorization covers candidate projection, frozen-observation FFN
+intervention, CPU validation and server scripts only. Historical "not authorized"
+statements below do not block this specific pilot, but still apply to broader
+cross-model discovery, rollout, texture optimization and transfer experiments.
+Preserve existing untracked experiment artifacts. Do not treat this pilot as C6-B.
+
 ## Project Context
 
 This repository is a research codebase for Shared-Feature Tex3D.
