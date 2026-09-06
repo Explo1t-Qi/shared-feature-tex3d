@@ -2,6 +2,12 @@
 
 ## Current Authorized UP Pilot
 
+The latest user authorization is the bounded per-observation local-gradient
+positive control in `docs/up-local-gradient-diagnostic.md`. Use only the original
+12 development/calibration frames. This diagnostic does not rerun screening,
+publish a neuron set, construct a shared direction, or start a scope experiment.
+The earlier action-relevant protocol below remains historical context.
+
 The user subsequently authorized the action-relevant screening extension. Its
 current contract is `docs/up-action-relevant-pilot.md`: screen on the original
 calibration groups, freeze the selection, validate on independent new groups.

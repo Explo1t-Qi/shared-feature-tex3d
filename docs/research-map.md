@@ -1,8 +1,9 @@
 # Shared-Feature Tex3D Research Map
 
-> Current bounded implementation: [UP action-relevant 筛选](up-action-relevant-pilot.md)。
+> Current bounded implementation: [实验 2：local gradient positive control](up-local-gradient-diagnostic.md)。
 > 前序 UP v1 真实模型运行完成，词汇 Top-10 未改变 decoded action tokens。
-> 新筛选与独立验证入口已授权并完成 CPU 验证，尚未执行本轮服务器实验。
+> 前序 action screening 工程完成但候选不足，未形成冻结集合；实验 1 的逐帧 D
+> 复算也未找到跨组稳定候选。本轮只诊断原 12 帧的局部可控性，待服务器执行。
 > 以下 C5/C6 与默认研究路线记录保持历史语义；UP pilot 是新的独立协议。
 
 ## 1. Research Goal
