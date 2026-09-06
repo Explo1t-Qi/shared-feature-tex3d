@@ -55,6 +55,7 @@ def test_preflight_creates_no_outputs_and_never_loads_model(tmp_path, monkeypatc
     tex3d = tmp_path / "tex3d/openvla"
     (tex3d / "experiments/robot").mkdir(parents=True)
     (tex3d / "experiments/robot/openvla_utils.py").write_text("")
+    (tex3d / "experiments/robot/openvla_model_inputs.py").write_text("")
     monkeypatch.setattr(pilot.smoke, "_validate_runtime_paths", lambda _: (checkpoint, tex3d))
     monkeypatch.setattr(pilot, "load_samples", lambda _: ([], []))
     monkeypatch.setattr(pilot, "repository_identity", lambda _: {"head": "a" * 40})
@@ -74,6 +75,20 @@ def test_preflight_creates_no_outputs_and_never_loads_model(tmp_path, monkeypatc
     (tmp_path / "new-parent/out").mkdir(parents=True)
     with pytest.raises(FileExistsError):
         pilot.main(argv)
+
+
+def test_prepare_tex3d_import_path_adds_legacy_sibling_module_directory(tmp_path):
+    root = tmp_path / "openvla"
+    robot = root / "experiments" / "robot"
+    robot.mkdir(parents=True)
+    (robot / "openvla_model_inputs.py").write_text("", encoding="utf-8")
+    resolved = str(robot.resolve())
+    while resolved in os.sys.path:
+        os.sys.path.remove(resolved)
+    pilot.prepare_tex3d_import_path(root)
+    assert os.sys.path[0] == resolved
+    pilot.prepare_tex3d_import_path(root)
+    assert os.sys.path.count(resolved) == 1
 
 
 class FakeModel(torch.nn.Module):
@@ -124,6 +139,9 @@ def setup_run(tmp_path, monkeypatch):
     records = samples(tmp_path)
     manifest = tmp_path / "manifest.json"; manifest.write_text("{}")
     model = FakeModel()
+    robot = tmp_path / "tex3d/openvla/experiments/robot"
+    robot.mkdir(parents=True)
+    (robot / "openvla_model_inputs.py").write_text("")
     runtime, logits = fake_runtime(model)
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)  # no actual GPU call in this fake
     monkeypatch.setattr(pilot.smoke, "_load_runtime", lambda _: runtime)

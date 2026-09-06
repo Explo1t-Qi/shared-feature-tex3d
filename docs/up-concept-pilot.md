@@ -162,3 +162,6 @@ Bash 成功后创建同名 `.review.tar.gz`，包含小型审阅证据；完整 
   `f0b7b644862fc002b1992c5c4618bf8f2c7e5177` 上复现同一失败。
   本次未修改该采集模块；当前 pilot 读取既有 observation，不调用采集器。
 - 尚未执行服务器 preflight、真实 checkpoint 干预或 GPU 验证。
+- 服务器首次运行暴露的包引用问题已定位并修复：Tex3D 的
+  `openvla_utils.py` 使用 top-level sibling import，pilot 现在会在 preflight
+  和 runtime 加载前加入并检查 `openvla/experiments/robot`。

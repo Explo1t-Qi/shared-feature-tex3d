@@ -115,6 +115,7 @@ def preflight(args: argparse.Namespace) -> tuple[dict[str, Any], list[Sample], l
     checkpoint, tex3d = smoke._validate_runtime_paths(args)
     if not (tex3d / "experiments/robot/openvla_utils.py").is_file():
         raise FileNotFoundError(f"not a Tex3D OpenVLA root: {tex3d}")
+    prepare_tex3d_import_path(tex3d)
     versions = {name: importlib.metadata.version(name) for name in
                 ("torch", "torchvision", "transformers", "tokenizers", "numpy")}
     required = {"torch": "2.2.0+cu121", "torchvision": "0.17.0+cu121",
@@ -153,6 +154,24 @@ def checkpoint_hashes(checkpoint: Path) -> dict[str, str]:
         print(f"hash checkpoint {p.name}", flush=True)
         result[p.name] = sha256_file(p)
     return result
+
+
+def prepare_tex3d_import_path(tex3d_openvla_root: Path) -> None:
+    """兼容 Tex3D 旧式 sibling imports used by ``openvla_utils``.
+
+    The deployed Tex3D tree keeps ``openvla_model_inputs.py`` and
+    ``openvla_policy_view.py`` beside ``openvla_utils.py`` but imports them as
+    top-level modules.  Adding that directory explicitly keeps the runtime
+    import deterministic without copying or modifying the Tex3D checkout.
+    """
+    robot_root = tex3d_openvla_root / "experiments" / "robot"
+    if not (robot_root / "openvla_model_inputs.py").is_file():
+        raise FileNotFoundError(
+            f"Tex3D sibling-import module not found: {robot_root / 'openvla_model_inputs.py'}"
+        )
+    source = str(robot_root.resolve())
+    if source not in sys.path:
+        sys.path.insert(0, source)
 
 
 def action_dict(action: Any) -> dict[str, Any]:
@@ -262,7 +281,9 @@ def run(args: argparse.Namespace, info: dict[str, Any], calibration: list[Sample
     write_json(output / "protocol.json", info)
     try:
         write_json(output / "checkpoint_hashes.json", checkpoint_hashes(args.pretrained_checkpoint))
-        runtime = smoke._load_runtime(args.tex3d_openvla_root.resolve())
+        tex3d_openvla_root = args.tex3d_openvla_root.resolve()
+        prepare_tex3d_import_path(tex3d_openvla_root)
+        runtime = smoke._load_runtime(tex3d_openvla_root)
         torch = runtime.torch
         if not torch.cuda.is_available():
             raise RuntimeError("CUDA is unavailable; preflight does not require a GPU")
