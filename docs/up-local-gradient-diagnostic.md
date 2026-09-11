@@ -12,8 +12,60 @@
 跨三个 trajectory groups 稳定的词汇候选。这尚不能区分候选空间、测量和
 干预接口的问题。
 
-当前实现及 CPU 工程检查见本文件末尾。真实 OpenVLA checkpoint 的实验 2
-尚待服务器执行；CPU 合成模型结果不作为其科学结论。
+**FACT（2026-09-11）**：真实 OpenVLA checkpoint 的实验 2 已执行并完成
+独立 NPZ 复算。工程状态为 `COMPLETE`，科学状态保持
+`LOCAL_DIAGNOSTIC_ONLY`。本轮支持 D 读出下的 per-observation 局部可控性；
+没有建立跨观测共同方向、稳定动作语义或迁移性。CPU 合成模型结果仅作为
+实现检查，不作为真实模型的科学结论。
+
+## 真实 OpenVLA 结果
+
+运行使用提交 `d5da7d0733f354528135ba34ec203722691c1147`，服务器环境为
+RTX 4090、Python 3.10.20、torch 2.2.0+cu121、transformers 4.40.1。
+12 个原有 observation 共得到 128 条干预记录；两个 boundary frames 正确
+跳过 D-gradient，所有其他 probe 均成功构造。没有产生 `frozen.json`。
+
+对 10 个 D 有定义的 observation，逐帧独立梯度的双向结果为：
+
+| 条件 | 步长 | D 双向 | E[z] 双向 | native decoded z 双向 |
+| --- | --- | --- | --- | --- |
+| lexical | 0.05 | 1/10 | 2/10 | 0/10 |
+| candidate gradient | 0.05 | 9/10 | 6/10 | 0/10 |
+| broader gradient | 0.05 | 9/10 | 7/10 | 1/10 |
+| lexical | 0.1 | 3/10 | 0/10 | 0/10 |
+| candidate gradient | 0.1 | 9/10 | 8/10 | 1/10 |
+| broader gradient | 0.1 | 10/10 | 10/10 | 1/10 |
+
+步长 0.1 时，`sign * Delta D` 的中位数分别为 lexical `0.0254`、
+candidate `0.7712`、broader `1.9803`。candidate 结果说明原 232 候选空间
+在当前 observation 下包含 action-z logit 可控方向；broader 更强、更一致，
+支持词汇预筛选可能漏掉更主要的局部方向。虽然 broader pool 没有显式排除
+232 候选，但 10 个有效帧中，它每帧最终选择的 10 个位置与 232 候选均为
+零重叠。由于两种梯度均逐帧用该帧 D 构造，这些结果不证明存在可复用的
+shared direction。
+
+步长 0.1 的中心有限差分/一阶预测比值，candidate 的十帧范围为
+`0.670–1.361`，broader 为 `0.854–1.116`。两个梯度组的实际 residual norm
+整体接近：broader/candidate 的逐帧逐 sign 比值中位数在步长 0.05、0.1 时
+分别为 `0.991`、`0.998`。这支持梯度实现和 all-token interface 能够产生
+预期方向的有限步 logit 响应。
+
+lexical 的实际/理想 residual norm 比值中位数在两个步长下为 `2.454`、
+`1.774`，而 candidate 为 `1.076`、`1.028`，broader 为 `1.077`、`1.030`。
+因此三组只匹配理论预算，lexical 与梯度组不是严格的实际 residual 匹配比较。
+lexical 表现较差也不能归因为实际注入幅度更小。
+
+native decoded z 的双向成功全部集中在 `state02/step0087`。步长 0.1 时，
+candidate 和 broader 在该帧均得到约 `+0.168634 / -0.095315` 的 deployed-z
+变化，但 rotation 维度也同时改变。另有部分帧的正负干预把 native z 推向
+同一侧，并伴随 x/y 或其他维度变化。因此本轮建立的是 D 的局部控制接口，
+没有建立稳定、纯净的 native action-z 控制。
+
+独立分析从全部 NPZ 重算 D、E[z]、argmax 和一阶预测；最大数值误差分别为
+`3.55e-15`、`4.87e-14`、exact match 和 `0`。12 帧 clean logits 与前序
+screen NPZ 逐元素一致，checkpoint/source hashes 均一致，分析前后源文件未变。
+完整复算记录见未纳入 Git 的
+`experiment_inbox/up-concept/up-local-gradient-analysis-d5da7d0733f3/`。
 
 ## 数据、目标与边界帧
 
@@ -131,7 +183,7 @@ summary 按同一帧的正负小步统计双向响应，同时显示每帧结果
 - 这些方向直接针对 D 构造。positive control 的目标是检查实现和有限步响应，
   其成功不是独立的语义验证，更不是跨帧稳定性或迁移性证据。
 
-## 服务器执行与交付
+## 服务器执行与已完成交付
 
 入口：`scripts/up_local_gradient_server_run.sh FULL_SHA --preflight-only|--run`。
 沿用已成功环境及 checkpoint，不改变依赖；`GPU_ID` 必须显式指定。
@@ -148,11 +200,13 @@ GPU_ID=7 bash scripts/up_local_gradient_server_run.sh "$DIAG_SHA" --run
 这里的 7 是前序设备示例，运行时使用实际空闲 GPU。preflight 不加载 checkpoint
 或创建结果目录；run 先执行 CPU 测试，再执行 GPU 诊断。拒绝覆盖已有输出。
 失败保留 console log 与 `failure.json`，不自动改模型、精度、scope 或步长重试。
-需要真实服务器验证的部分是 BF16 autograd 路径、显存及 native generation 响应。
+本次真实服务器执行已验证 BF16 autograd 路径能够完成，并保存 native
+generation 响应。下面的入口保留用于可复现性，不表示需要自动重跑。
 
 默认输出 `up-local-gradient-<SHA前12位>`。将同名 `.review.tar.gz` 和 console
 log 同步回本地即可先审阅所有 JSON 读出；NPZ 保留服务器供需要时独立复算。
-`COMPLETE` 只表示工程执行完成，科学状态固定为 `LOCAL_DIAGNOSTIC_ONLY`。
+已完成输出为 `up-local-gradient-d5da7d0733f3`。`COMPLETE` 只表示工程执行
+完成，科学状态固定为 `LOCAL_DIAGNOSTIC_ONLY`。
 
 ## 本机工程诊断
 
@@ -169,4 +223,4 @@ torch 2.2.0+cu121，CUDA 不可见）。合成模型在 eta=0.05 下的中心有
 斜率相对 autograd 预测误差分别为 candidate `5.773e-6`、broader `5.754e-6`。
 两组均产生双向 D 响应；该合成模型的 native decoded z 没有变化。边界帧仅有
 lexical 记录且 D 为 null。另一个 BF16 测试确认理论非零小步可被舍入完全抹掉。
-这些是工程验证，本次不生成真实 checkpoint 的科学判定。
+这些是工程验证；真实 checkpoint 的科学边界以上述逐帧结果为准。

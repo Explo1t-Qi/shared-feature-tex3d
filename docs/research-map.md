@@ -1,9 +1,12 @@
 # Shared-Feature Tex3D Research Map
 
-> Current bounded implementation: [实验 2：local gradient positive control](up-local-gradient-diagnostic.md)。
+> Latest completed bounded study: [实验 2：local gradient positive control](up-local-gradient-diagnostic.md)。
 > 前序 UP v1 真实模型运行完成，词汇 Top-10 未改变 decoded action tokens。
 > 前序 action screening 工程完成但候选不足，未形成冻结集合；实验 1 的逐帧 D
-> 复算也未找到跨组稳定候选。本轮只诊断原 12 帧的局部可控性，待服务器执行。
+> 复算也未找到跨组稳定候选。实验 2 已在原 12 帧完成：candidate / broader
+> 局部梯度能够稳定推动 D，但 native z 双向变化仅集中于一帧。结果支持局部
+> action-z logit 可控性，不支持 shared direction、稳定动作语义或迁移性。
+> 下一步是否构造 frozen direction 及其 train/test 拆分仍待讨论，尚未授权实现。
 > 以下 C5/C6 与默认研究路线记录保持历史语义；UP pilot 是新的独立协议。
 
 ## 1. Research Goal
