@@ -502,6 +502,12 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
     historical_dir = _resolve_directory(
         args.historical_c5bm_dir, "historical C5-BM artifact"
     )
+    try:
+        c5bm._validate_published_artifact(historical_dir)
+    except Exception as error:
+        raise Phase1MappingError(
+            "historical C5-BM artifact failed its authoritative validator"
+        ) from error
     historical_hashes = _hash_required_directory(
         historical_dir, HISTORICAL_FILES, label="historical C5-BM artifact"
     )
