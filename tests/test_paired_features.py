@@ -37,7 +37,7 @@ def _metadata(model: str, sample_id: str) -> dict[str, Any]:
         feature_schema_version = "openvla_features_v1"
     else:
         checkpoint = _PI05_CHECKPOINT
-        feature_schema_version = "pi05_features_v1"
+        feature_schema_version = "pi05_torch_features_v1"
     return {
         "sample_id": sample_id,
         "source_model": model,

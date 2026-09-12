@@ -31,13 +31,13 @@ def _small_specs(monkeypatch) -> tuple[common.FeatureSpec, common.FeatureSpec]:
         model_family="pi05",
         source_model="pi05",
         checkpoint_identity="gs://openpi-assets/checkpoints/pi05_libero",
-        feature_schema_version="pi05_features_v1",
+        feature_schema_version="pi05_torch_features_v1",
         manifest_filename="pi05_feature_manifest.json",
         nodes=(
             common.FeatureNode("P1", "p1_siglip", (2, 3)),
             common.FeatureNode("P2", "p2_projected", (2, 4)),
         ),
-        feature_config="pi05_libero",
+        feature_config="pi05_libero:PI0Pytorch",
     )
     monkeypatch.setattr(c4.c2, "SPEC", openvla_spec)
     monkeypatch.setattr(c4.c3, "SPEC", pi05_spec)
@@ -60,7 +60,7 @@ def _small_specs(monkeypatch) -> tuple[common.FeatureSpec, common.FeatureSpec]:
             label="pi0.5",
             feature_shapes={node.archive_key: node.shape for node in pi05_spec.nodes},
             source_model="pi05",
-            feature_schema_version="pi05_features_v1",
+            feature_schema_version="pi05_torch_features_v1",
             checkpoint=pi05_spec.checkpoint_identity,
         ),
     )

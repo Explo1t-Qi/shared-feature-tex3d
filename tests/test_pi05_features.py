@@ -5,6 +5,8 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
+import torch
+from torch import nn
 
 import shared_feature.pi05_features as features
 from shared_feature import (
@@ -14,9 +16,6 @@ from shared_feature import (
 )
 
 
-_UNSET = object()
-
-
 def make_observation(
     path: Path,
     sample_id: str,
@@ -24,16 +23,14 @@ def make_observation(
     *,
     state: np.ndarray | None = None,
     base_image: np.ndarray | None = None,
-    wrist_image: np.ndarray | None = None,
 ) -> Path:
     if base_image is None:
         base_image = np.zeros((3, 4, 3), dtype=np.uint8)
         base_image[-1, -1] = (value, value + 1, value + 2)
-    if wrist_image is None:
-        wrist_image = np.zeros((2, 5, 3), dtype=np.uint8)
-        wrist_image[-1, -1] = (value + 10, value + 11, value + 12)
+    wrist_image = np.zeros((2, 5, 3), dtype=np.uint8)
+    wrist_image[-1, -1] = (value + 10, value + 11, value + 12)
     if state is None:
-        state = np.arange(8, dtype=np.float64) + value
+        state = np.arange(8, dtype=np.float32) + value
     PilotObservation(
         sample_id=sample_id,
         task_id="2",
@@ -50,21 +47,9 @@ def make_observation(
     return path
 
 
-def make_norm_stats() -> dict[str, SimpleNamespace]:
-    return {
-        "state": SimpleNamespace(
-            mean=np.zeros(8),
-            std=np.ones(8),
-            q01=np.zeros(8),
-            q99=np.ones(8) * 10,
-        )
-    }
-
-
 class FakeImageTools:
-    def __init__(self):
+    def __init__(self) -> None:
         self.resize_inputs: list[np.ndarray] = []
-        self.convert_inputs: list[np.ndarray] = []
 
     def resize_with_pad(self, image, height, width):
         self.resize_inputs.append(image.copy())
@@ -72,165 +57,17 @@ class FakeImageTools:
         assert (height, width) == (224, 224)
         return np.broadcast_to(image[0, 0], (height, width, 3)).copy()
 
-    def convert_to_uint8(self, image):
-        self.convert_inputs.append(image.copy())
+    @staticmethod
+    def convert_to_uint8(image):
         return image.astype(np.uint8, copy=True)
 
 
-class FakeTree:
-    @classmethod
-    def map(cls, function, *trees):
-        first = trees[0]
-        if isinstance(first, dict):
-            return {
-                key: cls.map(function, *(tree[key] for tree in trees))
-                for key in first
-            }
-        return function(*trees)
-
-
-class FakeJax:
-    tree = FakeTree
-
-    @staticmethod
-    def device_get(value):
-        return np.asarray(value)
-
-
-class FakeJnp:
-    @staticmethod
-    def asarray(value):
-        return np.asarray(value)
-
-
-class FakeModelType:
-    PI05 = object()
-
-
-class FakeLiberoInputs:
-    def __init__(self, events):
-        self.events = events
-        self.inputs: list[dict] = []
-
-    def __call__(self, data):
-        self.events.append("libero")
-        self.inputs.append(data)
-        base = data["observation/image"]
-        wrist = data["observation/wrist_image"]
-        return {
-            "state": data["observation/state"],
-            "image": {
-                "base_0_rgb": base,
-                "left_wrist_0_rgb": wrist,
-                "right_wrist_0_rgb": np.zeros_like(base),
-            },
-            "image_mask": {
-                "base_0_rgb": np.True_,
-                "left_wrist_0_rgb": np.True_,
-                "right_wrist_0_rgb": np.False_,
-            },
-            "prompt": data["prompt"],
-        }
-
-
-class FakeSentinelTransform:
-    def __init__(self, events, name):
-        self.events = events
-        self.name = name
-
-    def __call__(self, data):
-        self.events.append(self.name)
-        return data
-
-
-class FakeTokenizeTransform(FakeSentinelTransform):
-    def __call__(self, data):
-        super().__call__(data)
-        data.pop("prompt")
-        data["tokenized_prompt"] = np.arange(200, dtype=np.int32)
-        data["tokenized_prompt_mask"] = np.ones(200, dtype=bool)
-        return data
-
-
-class FakePadTransform(FakeSentinelTransform):
-    def __call__(self, data):
-        super().__call__(data)
-        data["state"] = np.pad(data["state"], (0, 24))
-        return data
-
-
-class FakeInjectDefaultPrompt:
-    def __init__(self, events, prompt):
-        self.events = events
-        self.prompt = prompt
-
-    def __call__(self, data):
-        self.events.append("inject")
-        if self.prompt is not None and "prompt" not in data:
-            data["prompt"] = self.prompt
-        return data
-
-
-class FakeNormalize:
-    def __init__(self, owner, norm_stats, *, use_quantiles):
-        self.owner = owner
-        self.norm_stats = norm_stats
-        self.use_quantiles = use_quantiles
-        owner.normalize_instances.append(self)
-
-    def __call__(self, data):
-        self.owner.events.append("normalize")
-        return data
-
-
-class FakeTransforms:
-    def __init__(self, events):
-        self.events = events
-        self.normalize_instances: list[FakeNormalize] = []
-        self.composed: list[object] = []
-
-    def InjectDefaultPrompt(self, prompt):
-        return FakeInjectDefaultPrompt(self.events, prompt)
-
-    def Normalize(self, norm_stats, *, use_quantiles):
-        return FakeNormalize(
-            self,
-            norm_stats,
-            use_quantiles=use_quantiles,
-        )
-
-    def compose(self, transforms):
-        self.composed = list(transforms)
-
-        def apply(data):
-            for transform in transforms:
-                data = transform(data)
-            return data
-
-        return apply
-
-
-class FakeDataFactory:
-    def __init__(self, data_config):
-        self.data_config = data_config
-        self.calls: list[tuple[object, object]] = []
-
-    def create(self, assets_dirs, model):
-        self.calls.append((assets_dirs, model))
-        return self.data_config
-
-
-class FakeObservationType:
-    calls: list[dict] = []
-
+class FakeObservation:
     @classmethod
     def from_dict(cls, data):
-        cls.calls.append(data)
         images = {
-            name: value.astype(np.float32) / 255.0 * 2.0 - 1.0
-            if value.dtype == np.uint8
-            else value
-            for name, value in data["image"].items()
+            key: value.to(torch.float32).permute(0, 3, 1, 2) / 255.0 * 2.0 - 1.0
+            for key, value in data["image"].items()
         }
         return SimpleNamespace(
             images=images,
@@ -241,116 +78,126 @@ class FakeObservationType:
         )
 
 
-class FakeImageEncoder:
-    def __init__(self, mode="valid"):
-        self.mode = mode
-        self.inputs: list[np.ndarray] = []
+class FakeProjector(nn.Module):
+    def forward(self, value):
+        return value[..., :1].expand(-1, -1, 2048) + 1.0
 
-    def __call__(self, image, *, train):
-        assert train is False
-        self.inputs.append(np.asarray(image).copy())
-        if self.mode == "raise":
-            raise RuntimeError("encoder failed")
-        batch_size = image.shape[0]
-        markers = np.asarray(image)[:, 0, 0, 0].reshape(-1, 1, 1)
-        p1 = np.broadcast_to(
-            markers + 2.0,
-            (batch_size, 256, 1152),
-        ).copy()
-        p2 = np.broadcast_to(
-            markers + 3.0,
-            (batch_size, 256, 2048),
-        ).copy()
-        if self.mode == "missing_encoded":
-            return p2, {}
+
+class FakePaliGemmaWithExpert(nn.Module):
+    def __init__(self, mode: str = "valid") -> None:
+        super().__init__()
+        self.mode = mode
+        self.paligemma = SimpleNamespace(
+            model=SimpleNamespace(multi_modal_projector=FakeProjector())
+        )
+
+    def embed_image(self, image):
+        batch = image.shape[0]
+        marker = image[:, 0, 0, 0].reshape(batch, 1, 1)
+        token = torch.arange(256, device=image.device).reshape(1, 256, 1) / 256
+        p1 = (marker + token + 2.0).expand(batch, 256, 1152)
         if self.mode == "wrong_p1":
             p1 = p1[:, :, :-1]
+        if self.mode == "nonfinite":
+            p1 = p1.clone()
+            p1[0, 0, 0] = torch.nan
+        if self.mode == "wrong_dtype":
+            p1 = p1.to(torch.float64)
+        p2 = self.paligemma.model.multi_modal_projector(p1)
         if self.mode == "wrong_p2":
             p2 = p2[:, :, :-1]
-        if self.mode == "nonfinite":
-            p1[0, 0, 0] = np.nan
         if self.mode == "zero":
-            p2.fill(0)
-        return p2, {"encoded": p1}
+            p2 = torch.zeros_like(p2)
+        return p2
 
 
-class FakeModel:
-    def __init__(self, mode="valid"):
-        self.encoder = FakeImageEncoder(mode)
-        self.PaliGemma = SimpleNamespace(img=self.encoder)
+class FakeModel(nn.Module):
+    def __init__(self, mode: str = "valid") -> None:
+        super().__init__()
+        self.anchor = nn.Parameter(torch.tensor(1.0), requires_grad=False)
+        self.paligemma_with_expert = FakePaliGemmaWithExpert(mode)
+        self.preprocess_calls: list[bool] = []
+        self.prefix_corrupt = mode == "prefix_mismatch"
+
+    def _preprocess_observation(self, observation, *, train):
+        self.preprocess_calls.append(train)
+        return (
+            list(observation.images.values()),
+            list(observation.image_masks.values()),
+            observation.tokenized_prompt,
+            observation.tokenized_prompt_mask,
+            observation.state,
+        )
+
+    def embed_prefix(self, images, image_masks, lang_tokens, lang_masks):
+        del image_masks, lang_tokens, lang_masks
+        prefix = torch.cat(
+            [self.paligemma_with_expert.embed_image(image) for image in images],
+            dim=1,
+        )
+        if self.prefix_corrupt:
+            prefix = prefix.clone()
+            prefix[0, 0, 0] += 1.0
+        batch = prefix.shape[0]
+        return (
+            prefix,
+            torch.ones((batch, prefix.shape[1]), dtype=torch.bool),
+            torch.zeros((batch, prefix.shape[1]), dtype=torch.bool),
+        )
 
 
-def make_runtime():
-    events: list[str] = []
-    image_tools = FakeImageTools()
-    transforms = FakeTransforms(events)
-    libero_inputs = FakeLiberoInputs(events)
-    data_config = SimpleNamespace(
-        repo_id="physical-intelligence/libero",
-        asset_id="physical-intelligence/libero",
-        use_quantile_norm=True,
-        norm_stats="must-not-be-used",
-        data_transforms=SimpleNamespace(inputs=(libero_inputs,)),
-        model_transforms=SimpleNamespace(
-            inputs=(
-                FakeSentinelTransform(events, "model_prompt"),
-                FakeSentinelTransform(events, "resize"),
-                FakeTokenizeTransform(events, "tokenize"),
-                FakePadTransform(events, "pad"),
-            )
-        ),
-    )
-    data_factory = FakeDataFactory(data_config)
-    model_config = SimpleNamespace(
-        model_type=FakeModelType.PI05,
-        pi05=True,
-        action_horizon=10,
-        discrete_state_input=False,
-        action_dim=32,
-        max_token_len=200,
-    )
-    train_config = SimpleNamespace(
-        name="pi05_libero",
-        model=model_config,
-        data=data_factory,
-        assets_dirs=Path("configured-assets"),
-    )
-    preprocess_calls: list[tuple[object, bool, object]] = []
+class FakePolicy:
+    _is_pytorch_model = True
+    _pytorch_device = "cpu"
 
-    def preprocess_observation(rng, observation, *, train):
-        preprocess_calls.append((rng, train, observation))
-        return observation
+    def __init__(self) -> None:
+        self.inputs: list[dict] = []
 
-    FakeObservationType.calls = []
-    runtime = features._OpenPIRuntime(
-        jax=FakeJax,
-        jnp=FakeJnp,
-        image_tools=image_tools,
-        transforms=transforms,
-        observation_type=FakeObservationType,
-        preprocess_observation=preprocess_observation,
-        model_type=FakeModelType,
-    )
-    return SimpleNamespace(
-        runtime=runtime,
-        events=events,
-        image_tools=image_tools,
-        transforms=transforms,
-        libero_inputs=libero_inputs,
-        data_factory=data_factory,
-        train_config=train_config,
-        preprocess_calls=preprocess_calls,
-    )
+    def _input_transform(self, data):
+        self.inputs.append(data)
+        base = data["observation/image"]
+        wrist = data["observation/wrist_image"]
+        return {
+            "state": np.pad(data["observation/state"], (0, 24)),
+            "image": {
+                "base_0_rgb": base,
+                "left_wrist_0_rgb": wrist,
+                "right_wrist_0_rgb": np.zeros_like(base),
+            },
+            "image_mask": {
+                "base_0_rgb": np.True_,
+                "left_wrist_0_rgb": np.True_,
+                "right_wrist_0_rgb": np.False_,
+            },
+            "tokenized_prompt": np.arange(200, dtype=np.int32),
+            "tokenized_prompt_mask": np.ones(200, dtype=bool),
+        }
 
 
 def install_runtime(monkeypatch):
-    context = make_runtime()
-    monkeypatch.setattr(
-        features,
-        "_load_openpi_runtime",
-        lambda: context.runtime,
+    image_tools = FakeImageTools()
+    runtime = features._OpenPIRuntime(
+        torch=torch,
+        image_tools=image_tools,
+        observation_type=FakeObservation,
+        native_feature_dtype=torch.float32,
     )
-    return context
+    monkeypatch.setattr(features, "_load_openpi_runtime", lambda: runtime)
+    return image_tools
+
+
+def extract(monkeypatch, paths, output, *, model=None, batch_size=1):
+    image_tools = install_runtime(monkeypatch)
+    policy = FakePolicy()
+    written = extract_pi05_features(
+        model=model or FakeModel(),
+        policy=policy,
+        checkpoint="gs://openpi-assets/checkpoints/pi05_libero",
+        observation_paths=paths,
+        output_dir=output,
+        batch_size=batch_size,
+    )
+    return written, policy, image_tools
 
 
 def load_feature(path: Path):
@@ -363,128 +210,44 @@ def load_feature(path: Path):
         )
 
 
-def extract(
-    context,
-    observation_paths,
-    output_dir,
-    *,
-    model=None,
-    norm_stats=_UNSET,
-    batch_size=1,
-):
-    return extract_pi05_features(
-        model=model or FakeModel(),
-        train_config=context.train_config,
-        checkpoint="gs://openpi-assets/checkpoints/pi05_libero",
-        norm_stats=make_norm_stats() if norm_stats is _UNSET else norm_stats,
-        observation_paths=observation_paths,
-        output_dir=output_dir,
-        batch_size=batch_size,
-    )
-
-
-def test_extracts_ordered_batched_features_with_official_boundaries(
-    monkeypatch,
-    tmp_path,
+def test_extracts_current_pytorch_p2_with_official_order_and_identity(
+    monkeypatch, tmp_path
 ) -> None:
-    context = install_runtime(monkeypatch)
-    inputs = tmp_path / "inputs"
-    inputs.mkdir()
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
     paths = [
-        make_observation(inputs / "z.npz", "sample-z", 3),
-        make_observation(inputs / "a.npz", "sample.a", 7),
-        make_observation(inputs / "m.npz", "sample-m", 11),
+        make_observation(input_dir / "z.npz", "sample-z", 3),
+        make_observation(input_dir / "a.npz", "sample-a", 7),
+        make_observation(input_dir / "m.npz", "sample-m", 11),
     ]
     originals = [PilotObservation.load(path) for path in paths]
     model = FakeModel()
-    output_dir = tmp_path / "features"
-    supplied_stats = make_norm_stats()
 
-    written = extract(
-        context,
+    written, policy, image_tools = extract(
+        monkeypatch,
         paths,
-        output_dir,
+        tmp_path / "features",
         model=model,
-        norm_stats=supplied_stats,
         batch_size=2,
     )
 
-    assert written == tuple(
-        output_dir / f"{sample_id}.npz"
-        for sample_id in ("sample-z", "sample.a", "sample-m")
-    )
-    assert context.data_factory.calls == [
-        (context.train_config.assets_dirs, context.train_config.model)
+    assert [path.stem for path in written] == [
+        "sample-z",
+        "sample-a",
+        "sample-m",
     ]
-    normalize = context.transforms.normalize_instances[0]
-    assert normalize.use_quantiles is True
-    assert normalize.norm_stats["state"] is supplied_stats["state"]
-    assert context.events == [
-        event
-        for _ in paths
-        for event in (
-            "inject",
-            "libero",
-            "normalize",
-            "model_prompt",
-            "resize",
-            "tokenize",
-            "pad",
-        )
-    ]
-    assert len({id(value) for value in context.libero_inputs.inputs}) == len(paths)
-
-    assert len(context.image_tools.resize_inputs) == 6
-    assert len(context.image_tools.convert_inputs) == 6
+    assert model.preprocess_calls == [False, False]
+    assert len(policy.inputs) == 3
+    assert len(image_tools.resize_inputs) == 6
     for index, original in enumerate(originals):
-        base_input = context.image_tools.resize_inputs[index * 2]
-        wrist_input = context.image_tools.resize_inputs[index * 2 + 1]
         np.testing.assert_array_equal(
-            base_input,
+            image_tools.resize_inputs[index * 2],
             original.base_rgb_raw[::-1, ::-1],
         )
         np.testing.assert_array_equal(
-            wrist_input,
+            image_tools.resize_inputs[index * 2 + 1],
             original.wrist_rgb_raw[::-1, ::-1],
         )
-        assert base_input.flags.c_contiguous
-        assert wrist_input.flags.c_contiguous
-        reloaded = PilotObservation.load(paths[index])
-        np.testing.assert_array_equal(
-            reloaded.base_rgb_raw,
-            original.base_rgb_raw,
-        )
-        np.testing.assert_array_equal(
-            reloaded.wrist_rgb_raw,
-            original.wrist_rgb_raw,
-        )
-
-    assert [call["state"].shape[0] for call in FakeObservationType.calls] == [
-        2,
-        1,
-    ]
-    first_batched = FakeObservationType.calls[0]
-    assert np.all(first_batched["image"]["right_wrist_0_rgb"] == 0)
-    np.testing.assert_array_equal(
-        first_batched["image_mask"]["base_0_rgb"],
-        (True, True),
-    )
-    np.testing.assert_array_equal(
-        first_batched["image_mask"]["left_wrist_0_rgb"],
-        (True, True),
-    )
-    np.testing.assert_array_equal(
-        first_batched["image_mask"]["right_wrist_0_rgb"],
-        (False, False),
-    )
-    assert [(rng, train) for rng, train, _ in context.preprocess_calls] == [
-        (None, False),
-        (None, False),
-    ]
-    assert [value.shape for value in model.encoder.inputs] == [
-        (2, 224, 224, 3),
-        (1, 224, 224, 3),
-    ]
 
     for path, original in zip(written, originals, strict=True):
         metadata, p1, p2, keys = load_feature(path)
@@ -493,7 +256,7 @@ def test_extracts_ordered_batched_features_with_official_boundaries(
         ).hexdigest()
         assert metadata == {
             "checkpoint": "gs://openpi-assets/checkpoints/pi05_libero",
-            "feature_schema_version": "pi05_features_v1",
+            "feature_schema_version": "pi05_torch_features_v1",
             "sample_id": original.sample_id,
             "source_image_hash": f"sha256:{expected_hash}",
             "source_model": "pi05",
@@ -501,10 +264,9 @@ def test_extracts_ordered_batched_features_with_official_boundaries(
         assert keys == {"metadata_json", "p1_siglip", "p2_projected"}
         assert p1.shape == (256, 1152)
         assert p2.shape == (256, 2048)
-        assert p1.dtype == np.float32
-        assert p2.dtype == np.float32
-        assert np.all(p1 == p1[0, 0])
-        assert np.all(p2 == p2[0, 0])
+        assert p1.dtype == p2.dtype == np.float32
+        assert np.all(np.diff(p1[:, 0]) > 0)
+        np.testing.assert_allclose(p2[:, 0], p1[:, 0] + 1.0)
 
 
 @pytest.mark.parametrize(
@@ -527,23 +289,11 @@ def test_extracts_ordered_batched_features_with_official_boundaries(
             np.zeros((3, 4, 1), dtype=np.uint8),
             "uint8 RGB",
         ),
-        (
-            "bad-image-dtype",
-            np.zeros(8),
-            np.zeros((3, 4, 3), dtype=np.float32),
-            "uint8 RGB",
-        ),
     ],
 )
 def test_rejects_unsafe_or_malformed_observations(
-    monkeypatch,
-    tmp_path,
-    sample_id,
-    state,
-    base_image,
-    match,
+    monkeypatch, tmp_path, sample_id, state, base_image, match
 ) -> None:
-    context = install_runtime(monkeypatch)
     path = make_observation(
         tmp_path / "input.npz",
         sample_id,
@@ -551,148 +301,75 @@ def test_rejects_unsafe_or_malformed_observations(
         state=state,
         base_image=base_image,
     )
-
     with pytest.raises(Pi05FeatureExtractionError, match=match):
-        extract(context, [path], tmp_path / "output")
+        extract(monkeypatch, [path], tmp_path / "output")
 
 
-@pytest.mark.parametrize(
-    "norm_stats",
-    [
-        None,
-        {},
-        {"actions": SimpleNamespace(q01=np.zeros(7), q99=np.ones(7))},
-        {"state": SimpleNamespace(q01=None, q99=np.ones(8))},
-        {
-            "state": SimpleNamespace(
-                q01=np.zeros(7),
-                q99=np.ones(7),
-            )
-        },
-        {
-            "state": SimpleNamespace(
-                q01=np.zeros(9),
-                q99=np.ones(9),
-            )
-        },
-        {
-            "state": SimpleNamespace(
-                q01=np.ones(8),
-                q99=np.zeros(8),
-            )
-        },
-    ],
-)
-def test_rejects_missing_or_malformed_norm_stats(
-    monkeypatch,
-    tmp_path,
-    norm_stats,
+def test_rejects_identity_output_and_historical_overwrite_collisions(
+    monkeypatch, tmp_path
 ) -> None:
-    context = install_runtime(monkeypatch)
-    path = make_observation(tmp_path / "input.npz", "sample", 1)
-
-    with pytest.raises(Pi05FeatureExtractionError, match="norm_stats"):
-        extract(
-            context,
-            [path],
-            tmp_path / "output",
-            norm_stats=norm_stats,
-        )
-
-
-def test_rejects_identity_and_output_collisions(monkeypatch, tmp_path) -> None:
-    context = install_runtime(monkeypatch)
     first = make_observation(tmp_path / "first.npz", "same", 1)
     second = make_observation(tmp_path / "second.npz", "same", 2)
-
     with pytest.raises(Pi05FeatureExtractionError, match="duplicate observation"):
-        extract(context, [first, first], tmp_path / "duplicate-path")
+        extract(monkeypatch, [first, first], tmp_path / "duplicate-path")
     with pytest.raises(Pi05FeatureExtractionError, match="duplicate sample_id"):
-        extract(context, [first, second], tmp_path / "duplicate-id")
+        extract(monkeypatch, [first, second], tmp_path / "duplicate-id")
 
-    output_dir = tmp_path / "collision"
-    output_dir.mkdir()
-    existing = output_dir / "same.npz"
+    output = tmp_path / "historical-features"
+    output.mkdir()
+    existing = output / "same.npz"
     existing.write_bytes(b"keep")
     with pytest.raises(Pi05FeatureExtractionError, match="overwrite"):
-        extract(context, [first], output_dir)
+        extract(monkeypatch, [first], output)
     assert existing.read_bytes() == b"keep"
 
 
 @pytest.mark.parametrize(
     ("mode", "match"),
     [
-        ("missing_encoded", "encoded"),
         ("wrong_p1", "P1"),
         ("wrong_p2", "P2"),
+        ("prefix_mismatch", "embed_prefix"),
         ("nonfinite", "non-finite"),
+        ("wrong_dtype", "native feature dtype"),
         ("zero", "all-zero"),
     ],
 )
-def test_rejects_malformed_model_outputs(
-    monkeypatch,
-    tmp_path,
-    mode,
-    match,
+def test_rejects_wrong_node_or_prefix_semantics(
+    monkeypatch, tmp_path, mode, match
 ) -> None:
-    context = install_runtime(monkeypatch)
     path = make_observation(tmp_path / "input.npz", "sample", 1)
-
     with pytest.raises(Pi05FeatureExtractionError, match=match):
         extract(
-            context,
+            monkeypatch,
             [path],
             tmp_path / "output",
             model=FakeModel(mode),
         )
 
 
-def test_external_model_failure_is_chained(monkeypatch, tmp_path) -> None:
-    context = install_runtime(monkeypatch)
+def test_rejects_unfrozen_or_non_pytorch_model(monkeypatch, tmp_path) -> None:
+    install_runtime(monkeypatch)
     path = make_observation(tmp_path / "input.npz", "sample", 1)
-
-    with pytest.raises(
-        Pi05FeatureExtractionError,
-        match="visual extraction",
-    ) as info:
-        extract(
-            context,
-            [path],
-            tmp_path / "output",
-            model=FakeModel("raise"),
+    unfrozen = FakeModel()
+    unfrozen.anchor.requires_grad_(True)
+    with pytest.raises(Pi05FeatureExtractionError, match="frozen"):
+        extract_pi05_features(
+            model=unfrozen,
+            policy=FakePolicy(),
+            checkpoint="checkpoint",
+            observation_paths=[path],
+            output_dir=tmp_path / "unfrozen",
         )
-
-    assert isinstance(info.value.__cause__, RuntimeError)
-
-
-def test_rejects_missing_model_boundary_and_invalid_input_archive(
-    monkeypatch,
-    tmp_path,
-) -> None:
-    context = install_runtime(monkeypatch)
-    valid = make_observation(tmp_path / "valid.npz", "sample", 1)
-    with pytest.raises(Pi05FeatureExtractionError, match="PaliGemma.img"):
-        extract(
-            context,
-            [valid],
-            tmp_path / "missing-model",
-            model=SimpleNamespace(),
-        )
-
-    invalid = tmp_path / "invalid.npz"
-    invalid.write_bytes(b"not an archive")
-    with pytest.raises(
-        Pi05FeatureExtractionError,
-        match="PilotObservation",
-    ) as info:
-        extract(context, [invalid], tmp_path / "invalid-output")
-    assert info.value.__cause__ is not None
-
-    with pytest.raises(Pi05FeatureExtractionError, match="does not exist"):
-        extract(
-            context,
-            [tmp_path / "missing.npz"],
-            tmp_path / "missing-output",
+    policy = FakePolicy()
+    policy._is_pytorch_model = False
+    with pytest.raises(Pi05FeatureExtractionError, match="PI0Pytorch"):
+        extract_pi05_features(
+            model=FakeModel(),
+            policy=policy,
+            checkpoint="checkpoint",
+            observation_paths=[path],
+            output_dir=tmp_path / "jax",
         )
 
 
@@ -701,9 +378,8 @@ def test_rejects_invalid_batch_size(tmp_path, batch_size) -> None:
     with pytest.raises(Pi05FeatureExtractionError, match="batch_size"):
         extract_pi05_features(
             model=FakeModel(),
-            train_config=object(),
+            policy=FakePolicy(),
             checkpoint="checkpoint",
-            norm_stats=make_norm_stats(),
             observation_paths=[tmp_path / "unused.npz"],
             output_dir=tmp_path / "output",
             batch_size=batch_size,

@@ -8,6 +8,7 @@ from typing import Any
 
 import numpy as np
 import pytest
+import torch
 
 import scripts._full_feature_extraction_common as common
 import scripts.c3_full_feature_extraction as c3
@@ -19,13 +20,13 @@ def _small_spec() -> common.FeatureSpec:
         model_family="pi05",
         source_model="pi05",
         checkpoint_identity=c3.CHECKPOINT_IDENTITY,
-        feature_schema_version="pi05_features_v1",
+        feature_schema_version="pi05_torch_features_v1",
         manifest_filename="pi05_feature_manifest.json",
         nodes=(
             common.FeatureNode("P1", "p1_siglip", (2, 3)),
             common.FeatureNode("P2", "p2_projected", (2, 4)),
         ),
-        feature_config=c3.CONFIG_NAME,
+        feature_config=c3.EXTRACTION_IDENTITY,
     )
 
 
@@ -123,6 +124,13 @@ def _prepare_openpi_root(tmp_path: Path) -> Path:
     return openpi_root
 
 
+def _prepare_checkpoint(tmp_path: Path) -> Path:
+    checkpoint = tmp_path / "pi05-checkpoint"
+    (checkpoint / "assets").mkdir(parents=True)
+    (checkpoint / "model.safetensors").write_bytes(b"weights")
+    return checkpoint
+
+
 def _write_feature(
     path: Path,
     *,
@@ -163,8 +171,7 @@ def _fake_runtime(
     malformed_first: bool = False,
 ) -> c3._Runtime:
     model = object()
-    train_config = object()
-    norm_stats = object()
+    policy = object()
 
     def extractor(**kwargs: Any):
         events.append(kwargs)
@@ -182,8 +189,7 @@ def _fake_runtime(
 
     return c3._Runtime(
         model=model,
-        train_config=train_config,
-        norm_stats=norm_stats,
+        policy=policy,
         extractor=extractor,
     )
 
@@ -194,6 +200,7 @@ def test_full_c3_run_uses_frozen_config_identity_and_manifest(
 ) -> None:
     manifest_path = _prepare_collection(tmp_path)
     openpi_root = _prepare_openpi_root(tmp_path)
+    checkpoint = _prepare_checkpoint(tmp_path)
     output_dir = tmp_path / "c3-output"
     spec = _small_spec()
     events: list[Any] = []
@@ -201,27 +208,31 @@ def test_full_c3_run_uses_frozen_config_identity_and_manifest(
     monkeypatch.setattr(
         c3,
         "_load_runtime",
-        lambda root: _fake_runtime(spec, events),
+        lambda root, checkpoint_path: _fake_runtime(spec, events),
     )
     args = SimpleNamespace(
         collection_manifest=manifest_path,
         output_dir=output_dir,
         openpi_root=openpi_root,
+        checkpoint_dir=checkpoint,
     )
 
     summary = c3._run(args)
 
     assert summary == {
-        "status": "C3 pi0.5 Full Feature Extraction — COMPLETE",
+        "status": "Phase 1 PI0Pytorch Feature Extraction — COMPLETE",
         "manifest_path": str(output_dir.resolve() / spec.manifest_filename),
         "num_feature_archives": 200,
         "num_node_tensors": 400,
         "reused_archives": 0,
         "extracted_archives": 200,
+        "backend": "PI0Pytorch",
+        "checkpoint_path": str(checkpoint.resolve()),
     }
     assert len(events) == 1
     extractor_args = events[0]
     assert extractor_args["checkpoint"] == c3.CHECKPOINT_IDENTITY
+    assert extractor_args["policy"] is not None
     assert extractor_args["batch_size"] == 1
     assert len(extractor_args["observation_paths"]) == 200
     manifest = json.loads(
@@ -229,47 +240,43 @@ def test_full_c3_run_uses_frozen_config_identity_and_manifest(
     )
     assert manifest["pilot_version"] == "0.2"
     assert manifest["model_family"] == "pi05"
-    assert manifest["extraction"]["feature_config"] == c3.CONFIG_NAME
+    assert manifest["extraction"]["feature_config"] == c3.EXTRACTION_IDENTITY
     assert manifest["extraction"]["feature_checkpoint_identity"] == (
         c3.CHECKPOINT_IDENTITY
     )
     assert len(manifest["records"]) == 200
 
 
-def test_c3_runtime_uses_validated_config_download_and_norm_stats(
+def test_c3_runtime_requires_current_pytorch_checkpoint_and_freezes_model(
     monkeypatch,
     tmp_path,
 ) -> None:
     openpi_root = _prepare_openpi_root(tmp_path)
-    checkpoint_path = tmp_path / "checkpoint-cache"
-    (checkpoint_path / "assets").mkdir(parents=True)
+    checkpoint_path = _prepare_checkpoint(tmp_path)
     events: list[Any] = []
-    data_config = SimpleNamespace(asset_id="physical-intelligence/libero")
+    model_config = SimpleNamespace(
+        pi05=True,
+        action_horizon=10,
+        action_dim=32,
+        discrete_state_input=False,
+        max_token_len=200,
+    )
     train_config = SimpleNamespace(
-        assets_dirs=object(),
-        model=object(),
-        data=SimpleNamespace(
-            create=lambda assets, model: (
-                events.append(("data", assets, model)) or data_config
-            )
-        ),
+        name=c3.CONFIG_NAME,
+        model=model_config,
     )
-    fake_model = SimpleNamespace(
-        PaliGemma=SimpleNamespace(img=lambda *args, **kwargs: None),
-        parameters=lambda: iter([SimpleNamespace(dtype="torch.bfloat16")]),
-    )
+    fake_model = torch.nn.Linear(2, 2)
+    policy = SimpleNamespace(_is_pytorch_model=True, _model=fake_model)
     components = c3._OpenPIComponents(
-        jax=SimpleNamespace(default_backend=lambda: "gpu"),
-        jnp=object(),
-        openpi_model=object(),
-        download=SimpleNamespace(
-            maybe_download=lambda checkpoint: (
-                events.append(("download", checkpoint)) or checkpoint_path
-            )
+        torch=SimpleNamespace(
+            cuda=SimpleNamespace(is_available=lambda: True),
+            nn=torch.nn,
         ),
-        checkpoints=SimpleNamespace(
-            load_norm_stats=lambda assets, asset_id: (
-                events.append(("norm", assets, asset_id)) or {"state": object()}
+        model_type=torch.nn.Module,
+        policy_config=SimpleNamespace(
+            create_trained_policy=lambda config, checkpoint, pytorch_device: (
+                events.append(("policy", config, checkpoint, pytorch_device))
+                or policy
             )
         ),
         config=SimpleNamespace(
@@ -278,22 +285,15 @@ def test_c3_runtime_uses_validated_config_download_and_norm_stats(
         extractor=lambda **kwargs: (),
     )
     monkeypatch.setattr(c3, "_load_openpi_components", lambda root: components)
-    monkeypatch.setattr(
-        c3,
-        "_load_model",
-        lambda config, path, model_module, jnp: (fake_model, "pytorch"),
-    )
 
-    runtime = c3._load_runtime(openpi_root)
+    runtime = c3._load_runtime(openpi_root, checkpoint_path)
 
     assert runtime.model is fake_model
+    assert runtime.policy is policy
+    assert fake_model.training is False
+    assert not any(parameter.requires_grad for parameter in fake_model.parameters())
     assert ("config", c3.CONFIG_NAME) in events
-    assert ("download", c3.CHECKPOINT_IDENTITY) in events
-    assert (
-        "norm",
-        checkpoint_path / "assets",
-        "physical-intelligence/libero",
-    ) in events
+    assert ("policy", train_config, checkpoint_path, "cuda") in events
 
 
 def test_c3_rejects_malformed_extractor_output_without_manifest(
@@ -302,13 +302,16 @@ def test_c3_rejects_malformed_extractor_output_without_manifest(
 ) -> None:
     manifest_path = _prepare_collection(tmp_path)
     openpi_root = _prepare_openpi_root(tmp_path)
+    checkpoint = _prepare_checkpoint(tmp_path)
     output_dir = tmp_path / "malformed-output"
     spec = _small_spec()
     monkeypatch.setattr(c3, "SPEC", spec)
     monkeypatch.setattr(
         c3,
         "_load_runtime",
-        lambda root: _fake_runtime(spec, [], malformed_first=True),
+        lambda root, checkpoint_path: _fake_runtime(
+            spec, [], malformed_first=True
+        ),
     )
 
     with pytest.raises(common.FullFeatureExtractionError, match="shape"):
@@ -317,13 +320,14 @@ def test_c3_rejects_malformed_extractor_output_without_manifest(
                 collection_manifest=manifest_path,
                 output_dir=output_dir,
                 openpi_root=openpi_root,
+                checkpoint_dir=checkpoint,
             )
         )
     assert not (output_dir / spec.manifest_filename).exists()
     assert len(tuple((output_dir / "features").glob("*.npz"))) == 200
 
 
-def test_c3_frozen_schema_and_cli_exclude_checkpoint_override(tmp_path) -> None:
+def test_c3_frozen_schema_and_cli_expose_current_checkpoint_path(tmp_path) -> None:
     assert [(node.archive_key, node.shape) for node in c3.SPEC.nodes] == [
         ("p1_siglip", (256, 1152)),
         ("p2_projected", (256, 2048)),
@@ -340,15 +344,7 @@ def test_c3_frozen_schema_and_cli_exclude_checkpoint_override(tmp_path) -> None:
         "collection_manifest",
         "output_dir",
         "openpi_root",
+        "checkpoint_dir",
     }
-    with pytest.raises(SystemExit):
-        c3._parse_args(
-            [
-                "--collection-manifest",
-                str(tmp_path / "collection.json"),
-                "--output-dir",
-                str(tmp_path / "output"),
-                "--checkpoint",
-                "forbidden",
-            ]
-        )
+    assert args.checkpoint_dir == c3.DEFAULT_CHECKPOINT_DIR
+    assert c3.SPEC.feature_config == "pi05_libero:PI0Pytorch"

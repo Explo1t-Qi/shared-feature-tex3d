@@ -14,7 +14,7 @@ from .pilot_observation import PilotObservation
 
 
 _MODEL_INPUT_SIZE = 224
-_FEATURE_SCHEMA_VERSION = "pi05_features_v1"
+_FEATURE_SCHEMA_VERSION = "pi05_torch_features_v1"
 _EXPECTED_IMAGE_KEYS = (
     "base_0_rgb",
     "left_wrist_0_rgb",
@@ -27,18 +27,15 @@ _EXPECTED_FEATURE_SHAPES = {
 
 
 class Pi05FeatureExtractionError(RuntimeError):
-    """Raised when C3 cannot produce a valid pi0.5 feature record."""
+    """Raised when C3 cannot produce a valid current-backend pi0.5 record."""
 
 
 @dataclass(frozen=True)
 class _OpenPIRuntime:
-    jax: Any
-    jnp: Any
+    torch: Any
     image_tools: Any
-    transforms: Any
     observation_type: Any
-    preprocess_observation: Any
-    model_type: Any
+    native_feature_dtype: Any
 
 
 @dataclass(frozen=True)
@@ -51,18 +48,23 @@ class _InputRecord:
 def extract_pi05_features(
     *,
     model: Any,
-    train_config: Any,
+    policy: Any,
     checkpoint: str | Path,
-    norm_stats: Any,
     observation_paths: Sequence[str | Path],
     output_dir: str | Path,
     batch_size: int = 1,
 ) -> tuple[Path, ...]:
-    """Extract and serialize the frozen C3 pi0.5 representation nodes."""
+    """Extract current PI0Pytorch P1/P2 records for frozen observations.
+
+    P2 is the direct result of ``paligemma_with_expert.embed_image``. Every
+    batch is also passed through the official ``embed_prefix`` path, and the
+    direct result must be bitwise equal to the base-camera prefix slice. P1 is
+    retained only for the historical control-pair schema and is captured at
+    the input of the official multimodal projector during that same direct
+    image-embedding call.
+    """
     if type(batch_size) is not int or batch_size <= 0:
-        raise Pi05FeatureExtractionError(
-            "batch_size must be a positive integer"
-        )
+        raise Pi05FeatureExtractionError("batch_size must be a positive integer")
 
     paths = tuple(Path(path) for path in observation_paths)
     if not paths:
@@ -77,9 +79,8 @@ def extract_pi05_features(
 
     records = _load_input_records(paths, destination)
     runtime = _load_openpi_runtime()
-    stats = _validate_norm_stats(norm_stats)
-    transform = _build_input_transform(train_config, stats, runtime)
-    image_encoder = _validate_model(model)
+    input_transform, device = _validate_policy(policy)
+    embed_image, projector = _validate_model(model, runtime)
 
     try:
         destination.mkdir(parents=True, exist_ok=True)
@@ -90,49 +91,42 @@ def extract_pi05_features(
 
     checkpoint_id = str(checkpoint)
     written_paths: list[Path] = []
+    model.eval()
     for start in range(0, len(records), batch_size):
         batch = records[start : start + batch_size]
         _validate_batch_output_paths(batch)
         transformed_records = tuple(
-            _transform_record(item.observation, transform, runtime)
+            _transform_record(item.observation, input_transform, runtime)
             for item in batch
         )
         observation = _build_batched_observation(
             transformed_records,
             expected_batch_size=len(batch),
+            device=device,
             runtime=runtime,
         )
 
         try:
-            p2, aux = image_encoder(
-                observation.images["base_0_rgb"],
-                train=False,
+            p1, p2 = _extract_projected_base_tokens(
+                model=model,
+                observation=observation,
+                embed_image=embed_image,
+                projector=projector,
+                expected_batch_size=len(batch),
+                runtime=runtime,
             )
+        except Pi05FeatureExtractionError:
+            raise
         except Exception as error:
             raise Pi05FeatureExtractionError(
                 f"pi0.5 visual extraction failed for batch starting at index {start}"
             ) from error
-        if not isinstance(aux, Mapping) or "encoded" not in aux:
-            raise Pi05FeatureExtractionError(
-                "model.PaliGemma.img output is missing aux['encoded']"
-            )
-        p1 = aux["encoded"]
-        _validate_batched_feature(
-            "P1",
-            p1,
-            (len(batch), *_EXPECTED_FEATURE_SHAPES["p1_siglip"]),
-        )
-        _validate_batched_feature(
-            "P2",
-            p2,
-            (len(batch), *_EXPECTED_FEATURE_SHAPES["p2_projected"]),
-        )
 
         for index, item in enumerate(batch):
             try:
                 arrays = {
-                    "p1_siglip": _to_serialized_array(p1[index], runtime),
-                    "p2_projected": _to_serialized_array(p2[index], runtime),
+                    "p1_siglip": _to_serialized_array(p1[index]),
+                    "p2_projected": _to_serialized_array(p2[index]),
                 }
             except Exception as error:
                 raise Pi05FeatureExtractionError(
@@ -163,24 +157,18 @@ def extract_pi05_features(
 
 def _load_openpi_runtime() -> _OpenPIRuntime:
     try:
-        import jax
-        import jax.numpy as jnp
-        from openpi import transforms
+        import torch
         from openpi.models import model as openpi_model
         from openpi_client import image_tools
     except Exception as error:
         raise Pi05FeatureExtractionError(
-            "failed to load required OpenPI preprocessing dependencies"
+            "failed to load required PI0Pytorch preprocessing dependencies"
         ) from error
-
     return _OpenPIRuntime(
-        jax=jax,
-        jnp=jnp,
+        torch=torch,
         image_tools=image_tools,
-        transforms=transforms,
         observation_type=openpi_model.Observation,
-        preprocess_observation=openpi_model.preprocess_observation,
-        model_type=openpi_model.ModelType,
+        native_feature_dtype=torch.bfloat16,
     )
 
 
@@ -194,13 +182,9 @@ def _validate_unique_input_paths(paths: tuple[Path, ...]) -> None:
                 f"observation file does not exist: {path}"
             ) from error
         if not resolved.is_file():
-            raise Pi05FeatureExtractionError(
-                f"observation path is not a file: {path}"
-            )
+            raise Pi05FeatureExtractionError(f"observation path is not a file: {path}")
         if resolved in resolved_paths:
-            raise Pi05FeatureExtractionError(
-                f"duplicate observation path: {path}"
-            )
+            raise Pi05FeatureExtractionError(f"duplicate observation path: {path}")
         resolved_paths.add(resolved)
 
 
@@ -219,14 +203,10 @@ def _load_input_records(
             ) from error
         _validate_sample_id(observation.sample_id)
         _validate_raw_image(
-            "base_rgb_raw",
-            observation.base_rgb_raw,
-            observation.sample_id,
+            "base_rgb_raw", observation.base_rgb_raw, observation.sample_id
         )
         _validate_raw_image(
-            "wrist_rgb_raw",
-            observation.wrist_rgb_raw,
-            observation.sample_id,
+            "wrist_rgb_raw", observation.wrist_rgb_raw, observation.sample_id
         )
         _validate_state(observation.state, observation.sample_id)
 
@@ -241,16 +221,12 @@ def _load_input_records(
             raise Pi05FeatureExtractionError(
                 f"refusing to overwrite existing feature file: {output_path}"
             )
-        image_bytes = np.ascontiguousarray(
-            observation.base_rgb_raw
-        ).tobytes()
+        image_bytes = np.ascontiguousarray(observation.base_rgb_raw).tobytes()
         records.append(
             _InputRecord(
                 observation=observation,
                 output_path=output_path,
-                source_image_hash=(
-                    f"sha256:{hashlib.sha256(image_bytes).hexdigest()}"
-                ),
+                source_image_hash=f"sha256:{hashlib.sha256(image_bytes).hexdigest()}",
             )
         )
     return tuple(records)
@@ -300,157 +276,67 @@ def _validate_state(state: Any, sample_id: str) -> None:
         )
 
 
-def _validate_norm_stats(norm_stats: Any) -> dict[str, Any]:
-    if not isinstance(norm_stats, Mapping) or not norm_stats:
-        raise Pi05FeatureExtractionError(
-            "norm_stats must be a non-empty mapping"
-        )
-    if "state" not in norm_stats:
-        raise Pi05FeatureExtractionError(
-            "norm_stats must contain checkpoint state statistics"
-        )
-
-    stats = dict(norm_stats)
-    for name, value in stats.items():
-        q01 = getattr(value, "q01", None)
-        q99 = getattr(value, "q99", None)
-        if q01 is None or q99 is None:
-            raise Pi05FeatureExtractionError(
-                f"norm_stats entry {name!r} must contain q01 and q99"
-            )
-        try:
-            lower = np.asarray(q01)
-            upper = np.asarray(q99)
-        except Exception as error:
-            raise Pi05FeatureExtractionError(
-                f"norm_stats entry {name!r} has malformed quantiles"
-            ) from error
-        if (
-            lower.shape != upper.shape
-            or lower.size == 0
-            or not np.issubdtype(lower.dtype, np.number)
-            or not np.issubdtype(upper.dtype, np.number)
-            or not np.isrealobj(lower)
-            or not np.isrealobj(upper)
-            or not np.all(np.isfinite(lower))
-            or not np.all(np.isfinite(upper))
-            or np.any(upper < lower)
-        ):
-            raise Pi05FeatureExtractionError(
-                f"norm_stats entry {name!r} has invalid quantiles"
-            )
-
-    state_q01 = np.asarray(stats["state"].q01)
-    if state_q01.shape != (8,):
-        raise Pi05FeatureExtractionError(
-            "state norm_stats quantiles must have shape (8,)"
-        )
-    return stats
-
-
-def _build_input_transform(
-    train_config: Any,
-    norm_stats: dict[str, Any],
-    runtime: _OpenPIRuntime,
-) -> Any:
-    _validate_train_config(train_config, runtime)
-    try:
-        data_config = train_config.data.create(
-            train_config.assets_dirs,
-            train_config.model,
-        )
-    except Exception as error:
-        raise Pi05FeatureExtractionError(
-            "failed to construct pi05_libero DataConfig"
-        ) from error
-    _validate_data_config(data_config)
-
-    try:
-        return runtime.transforms.compose(
-            [
-                runtime.transforms.InjectDefaultPrompt(None),
-                *data_config.data_transforms.inputs,
-                runtime.transforms.Normalize(
-                    norm_stats,
-                    use_quantiles=data_config.use_quantile_norm,
-                ),
-                *data_config.model_transforms.inputs,
-            ]
-        )
-    except Exception as error:
-        raise Pi05FeatureExtractionError(
-            "failed to construct pi05_libero input transforms"
-        ) from error
-
-
-def _validate_train_config(
-    train_config: Any,
-    runtime: _OpenPIRuntime,
-) -> None:
-    model_config = getattr(train_config, "model", None)
+def _validate_policy(policy: Any) -> tuple[Any, Any]:
+    transform = getattr(policy, "_input_transform", None)
+    device = getattr(policy, "_pytorch_device", None)
     if (
-        getattr(train_config, "name", None) != "pi05_libero"
-        or model_config is None
-        or getattr(model_config, "model_type", None)
-        != runtime.model_type.PI05
-        or getattr(model_config, "pi05", None) is not True
-        or getattr(model_config, "action_horizon", None) != 10
-        or getattr(model_config, "discrete_state_input", None) is not False
-        or getattr(model_config, "action_dim", None) != 32
-        or getattr(model_config, "max_token_len", None) != 200
-        or not hasattr(train_config, "data")
-        or not hasattr(train_config, "assets_dirs")
+        getattr(policy, "_is_pytorch_model", None) is not True
+        or not callable(transform)
+        or device is None
     ):
         raise Pi05FeatureExtractionError(
-            "train_config is incompatible with frozen pi05_libero semantics"
+            "policy must expose the current PI0Pytorch input-transform path"
         )
+    return transform, device
 
 
-def _validate_data_config(data_config: Any) -> None:
-    if (
-        getattr(data_config, "repo_id", None) != "physical-intelligence/libero"
-        or getattr(data_config, "asset_id", None)
-        != "physical-intelligence/libero"
-        or getattr(data_config, "use_quantile_norm", None) is not True
-        or not hasattr(getattr(data_config, "data_transforms", None), "inputs")
-        or not hasattr(getattr(data_config, "model_transforms", None), "inputs")
-    ):
+def _validate_model(model: Any, runtime: _OpenPIRuntime) -> tuple[Any, Any]:
+    paligemma_with_expert = getattr(model, "paligemma_with_expert", None)
+    embed_image = getattr(paligemma_with_expert, "embed_image", None)
+    paligemma = getattr(paligemma_with_expert, "paligemma", None)
+    projector = getattr(
+        getattr(paligemma, "model", None), "multi_modal_projector", None
+    )
+    if not callable(embed_image) or not hasattr(projector, "register_forward_pre_hook"):
         raise Pi05FeatureExtractionError(
-            "DataConfig is incompatible with frozen pi05_libero semantics"
+            "model must expose PI0Pytorch paligemma_with_expert.embed_image "
+            "and its multimodal projector"
         )
+    if not isinstance(model, runtime.torch.nn.Module):
+        raise Pi05FeatureExtractionError("pi0.5 model must be a torch.nn.Module")
+    if any(parameter.requires_grad for parameter in model.parameters()):
+        raise Pi05FeatureExtractionError(
+            "PI0Pytorch feature extraction requires frozen model parameters"
+        )
+    return embed_image, projector
 
 
 def _transform_record(
     observation: PilotObservation,
-    transform: Any,
+    input_transform: Any,
     runtime: _OpenPIRuntime,
 ) -> dict[str, Any]:
     try:
-        base_image = _preprocess_client_image(
-            observation.base_rgb_raw,
-            runtime,
+        base_image = _preprocess_client_image(observation.base_rgb_raw, runtime)
+        wrist_image = _preprocess_client_image(observation.wrist_rgb_raw, runtime)
+        transformed = input_transform(
+            {
+                "observation/image": base_image,
+                "observation/wrist_image": wrist_image,
+                "observation/state": observation.state.copy(),
+                "prompt": observation.prompt,
+            }
         )
-        wrist_image = _preprocess_client_image(
-            observation.wrist_rgb_raw,
-            runtime,
-        )
-        policy_input = {
-            "observation/image": base_image,
-            "observation/wrist_image": wrist_image,
-            "observation/state": observation.state.copy(),
-            "prompt": observation.prompt,
-        }
-        transformed = transform(policy_input)
     except Pi05FeatureExtractionError:
         raise
     except Exception as error:
         raise Pi05FeatureExtractionError(
-            "pi05_libero preprocessing failed for "
+            "pi05_libero policy preprocessing failed for "
             f"sample_id={observation.sample_id}"
         ) from error
     if not isinstance(transformed, dict):
         raise Pi05FeatureExtractionError(
-            "pi05_libero input transforms must return a dictionary"
+            "pi05_libero input transform must return a dictionary"
         )
     _validate_transformed_slots(
         transformed,
@@ -466,9 +352,7 @@ def _preprocess_client_image(
 ) -> np.ndarray:
     rotated = np.ascontiguousarray(image[::-1, ::-1])
     resized = runtime.image_tools.resize_with_pad(
-        rotated,
-        _MODEL_INPUT_SIZE,
-        _MODEL_INPUT_SIZE,
+        rotated, _MODEL_INPUT_SIZE, _MODEL_INPUT_SIZE
     )
     converted = runtime.image_tools.convert_to_uint8(resized)
     if (
@@ -490,33 +374,26 @@ def _validate_transformed_slots(
 ) -> None:
     images = transformed.get("image")
     masks = transformed.get("image_mask")
-    expected_keys = set(_EXPECTED_IMAGE_KEYS)
-    if not isinstance(images, Mapping) or set(images) != expected_keys:
+    if not isinstance(images, Mapping) or tuple(images) != _EXPECTED_IMAGE_KEYS:
         raise Pi05FeatureExtractionError(
-            "pi05_libero transforms produced malformed image slots"
+            "pi05_libero transforms changed the frozen image-slot ordering"
         )
-    if not isinstance(masks, Mapping) or set(masks) != expected_keys:
+    if not isinstance(masks, Mapping) or tuple(masks) != _EXPECTED_IMAGE_KEYS:
         raise Pi05FeatureExtractionError(
-            "pi05_libero transforms produced malformed image masks"
+            "pi05_libero transforms changed the frozen image-mask ordering"
         )
     if not np.array_equal(np.asarray(images["base_0_rgb"]), expected_base):
         raise Pi05FeatureExtractionError(
             "base_0_rgb does not preserve the client-preprocessed base image"
         )
-    if not np.array_equal(
-        np.asarray(images["left_wrist_0_rgb"]),
-        expected_wrist,
-    ):
+    if not np.array_equal(np.asarray(images["left_wrist_0_rgb"]), expected_wrist):
         raise Pi05FeatureExtractionError(
             "left_wrist_0_rgb does not preserve the client-preprocessed wrist image"
         )
     if not np.array_equal(
-        np.asarray(images["right_wrist_0_rgb"]),
-        np.zeros_like(expected_base),
+        np.asarray(images["right_wrist_0_rgb"]), np.zeros_like(expected_base)
     ):
-        raise Pi05FeatureExtractionError(
-            "right_wrist_0_rgb must be zero padding"
-        )
+        raise Pi05FeatureExtractionError("right_wrist_0_rgb must be zero padding")
 
     expected_masks = {
         "base_0_rgb": True,
@@ -531,119 +408,221 @@ def _validate_transformed_slots(
             )
 
 
+def _tree_stack_to_torch(
+    values: tuple[Any, ...],
+    *,
+    device: Any,
+    runtime: _OpenPIRuntime,
+) -> Any:
+    first = values[0]
+    if isinstance(first, Mapping):
+        keys = tuple(first)
+        if any(tuple(value) != keys for value in values):
+            raise Pi05FeatureExtractionError(
+                "transformed records have inconsistent mapping order"
+            )
+        return {
+            key: _tree_stack_to_torch(
+                tuple(value[key] for value in values),
+                device=device,
+                runtime=runtime,
+            )
+            for key in keys
+        }
+    try:
+        array = np.stack([np.asarray(value) for value in values], axis=0)
+        return runtime.torch.from_numpy(array.copy()).to(device)
+    except Exception as error:
+        raise Pi05FeatureExtractionError(
+            "failed to stack transformed PI0Pytorch values"
+        ) from error
+
+
 def _build_batched_observation(
     transformed_records: tuple[dict[str, Any], ...],
     *,
     expected_batch_size: int,
+    device: Any,
     runtime: _OpenPIRuntime,
 ) -> Any:
-    try:
-        batched = runtime.jax.tree.map(
-            lambda *values: runtime.jnp.asarray(
-                np.stack([np.asarray(value) for value in values], axis=0)
-            ),
-            *transformed_records,
-        )
-    except Exception as error:
-        raise Pi05FeatureExtractionError(
-            "failed to stack transformed pi05_libero records"
-        ) from error
-
-    try:
-        observation = runtime.observation_type.from_dict(batched)
-        observation = runtime.preprocess_observation(
-            None,
-            observation,
-            train=False,
-        )
-    except Exception as error:
-        raise Pi05FeatureExtractionError(
-            "failed to construct batched pi0.5 Observation"
-        ) from error
-    _validate_batched_observation(
-        observation,
-        expected_batch_size,
-        runtime,
+    inputs = _tree_stack_to_torch(
+        transformed_records,
+        device=device,
+        runtime=runtime,
     )
+    try:
+        observation = runtime.observation_type.from_dict(inputs)
+    except Exception as error:
+        raise Pi05FeatureExtractionError(
+            "failed to construct batched PI0Pytorch Observation"
+        ) from error
+    _validate_model_observation(observation, expected_batch_size)
     return observation
 
 
-def _validate_batched_observation(
-    observation: Any,
-    expected_batch_size: int,
-    runtime: _OpenPIRuntime,
-) -> None:
+def _validate_model_observation(observation: Any, expected_batch_size: int) -> None:
     images = getattr(observation, "images", None)
     masks = getattr(observation, "image_masks", None)
-    if not isinstance(images, Mapping) or set(images) != set(
-        _EXPECTED_IMAGE_KEYS
-    ):
+    if not isinstance(images, Mapping) or tuple(images) != _EXPECTED_IMAGE_KEYS:
         raise Pi05FeatureExtractionError(
-            "batched Observation has malformed image slots"
+            "PI0Pytorch Observation has unexpected image-slot ordering"
         )
-    if not isinstance(masks, Mapping) or set(masks) != set(
-        _EXPECTED_IMAGE_KEYS
-    ):
+    if not isinstance(masks, Mapping) or tuple(masks) != _EXPECTED_IMAGE_KEYS:
         raise Pi05FeatureExtractionError(
-            "batched Observation has malformed image masks"
+            "PI0Pytorch Observation has unexpected image-mask ordering"
         )
     for name in _EXPECTED_IMAGE_KEYS:
         image_shape = tuple(getattr(images[name], "shape", ()))
         mask_shape = tuple(getattr(masks[name], "shape", ()))
         if image_shape != (
             expected_batch_size,
-            _MODEL_INPUT_SIZE,
-            _MODEL_INPUT_SIZE,
             3,
+            _MODEL_INPUT_SIZE,
+            _MODEL_INPUT_SIZE,
         ):
             raise Pi05FeatureExtractionError(
-                f"unexpected batched image shape for {name}: {image_shape}"
+                f"unexpected PI0Pytorch image shape for {name}: {image_shape}"
             )
         if mask_shape != (expected_batch_size,):
             raise Pi05FeatureExtractionError(
-                f"unexpected batched image mask shape for {name}: {mask_shape}"
+                f"unexpected PI0Pytorch image-mask shape for {name}: {mask_shape}"
             )
-
-    expected_masks = {
-        "base_0_rgb": True,
-        "left_wrist_0_rgb": True,
-        "right_wrist_0_rgb": False,
-    }
-    for name, expected in expected_masks.items():
-        values = np.asarray(runtime.jax.device_get(masks[name]))
-        if not np.all(values == expected):
+        if images[name].dtype != images[name].new_zeros(()).float().dtype:
             raise Pi05FeatureExtractionError(
-                f"unexpected batched PI05 image mask for {name}"
+                f"PI0Pytorch input image dtype must be float32 for {name}"
             )
-
+        if masks[name].dtype != masks[name].new_zeros(()).bool().dtype:
+            raise Pi05FeatureExtractionError(
+                f"PI0Pytorch input mask dtype must be bool for {name}"
+            )
     state_shape = tuple(getattr(observation.state, "shape", ()))
-    prompt_shape = tuple(
-        getattr(observation.tokenized_prompt, "shape", ())
-    )
+    prompt_shape = tuple(getattr(observation.tokenized_prompt, "shape", ()))
     prompt_mask_shape = tuple(
         getattr(observation.tokenized_prompt_mask, "shape", ())
     )
     if state_shape != (expected_batch_size, 32):
         raise Pi05FeatureExtractionError(
-            f"unexpected batched state shape: {state_shape}"
+            f"unexpected PI0Pytorch state shape: {state_shape}"
         )
     if prompt_shape != (expected_batch_size, 200) or prompt_mask_shape != (
         expected_batch_size,
         200,
     ):
         raise Pi05FeatureExtractionError(
-            "unexpected batched tokenized prompt shape"
+            "unexpected PI0Pytorch tokenized-prompt shape"
         )
 
 
-def _validate_model(model: Any) -> Any:
-    paligemma = getattr(model, "PaliGemma", None)
-    image_encoder = getattr(paligemma, "img", None)
-    if not callable(image_encoder):
-        raise Pi05FeatureExtractionError(
-            "model must expose callable PaliGemma.img"
+def _extract_projected_base_tokens(
+    *,
+    model: Any,
+    observation: Any,
+    embed_image: Any,
+    projector: Any,
+    expected_batch_size: int,
+    runtime: _OpenPIRuntime,
+) -> tuple[Any, Any]:
+    torch = runtime.torch
+    captures: list[Any] = []
+
+    def capture_projector_input(_module: Any, args: tuple[Any, ...]) -> None:
+        if len(args) != 1:
+            raise Pi05FeatureExtractionError(
+                "PI0Pytorch multimodal projector received unexpected arguments"
+            )
+        captures.append(args[0])
+
+    model.eval()
+    with torch.no_grad():
+        if torch.is_grad_enabled():
+            raise Pi05FeatureExtractionError("torch.no_grad guard is not active")
+        prepared = model._preprocess_observation(observation, train=False)
+        if not isinstance(prepared, tuple) or len(prepared) != 5:
+            raise Pi05FeatureExtractionError(
+                "PI0Pytorch._preprocess_observation must return five values"
+            )
+        images, image_masks, lang_tokens, lang_masks, _ = prepared
+        if len(images) != len(_EXPECTED_IMAGE_KEYS) or len(image_masks) != len(
+            _EXPECTED_IMAGE_KEYS
+        ):
+            raise Pi05FeatureExtractionError(
+                "PI0Pytorch preprocessing must preserve three image slots"
+            )
+        expected_masks = (True, True, False)
+        for key, image, mask, expected_mask in zip(
+            _EXPECTED_IMAGE_KEYS,
+            images,
+            image_masks,
+            expected_masks,
+            strict=True,
+        ):
+            if tuple(image.shape) != (
+                expected_batch_size,
+                3,
+                _MODEL_INPUT_SIZE,
+                _MODEL_INPUT_SIZE,
+            ):
+                raise Pi05FeatureExtractionError(
+                    f"PI0Pytorch preprocessing changed image layout for {key}"
+                )
+            expected = torch.full_like(mask, expected_mask, dtype=torch.bool)
+            if mask.dtype != torch.bool or not torch.equal(mask, expected):
+                raise Pi05FeatureExtractionError(
+                    f"PI0Pytorch preprocessing changed mask semantics for {key}"
+                )
+        image_by_key = dict(zip(_EXPECTED_IMAGE_KEYS, images, strict=True))
+        prefix, _, _ = model.embed_prefix(
+            images, image_masks, lang_tokens, lang_masks
         )
-    return image_encoder
+
+        handle = projector.register_forward_pre_hook(capture_projector_input)
+        try:
+            direct = {
+                key: embed_image(image_by_key[key]) for key in _EXPECTED_IMAGE_KEYS
+            }
+        finally:
+            handle.remove()
+
+        if len(captures) != len(_EXPECTED_IMAGE_KEYS):
+            raise Pi05FeatureExtractionError(
+                "PI0Pytorch projector hook did not capture one P1 per image slot"
+            )
+        for index, key in enumerate(_EXPECTED_IMAGE_KEYS):
+            p2 = direct[key]
+            p1 = captures[index]
+            _validate_batched_feature(
+                f"{key} P1",
+                p1,
+                (expected_batch_size, *_EXPECTED_FEATURE_SHAPES["p1_siglip"]),
+            )
+            _validate_batched_feature(
+                f"{key} P2",
+                p2,
+                (expected_batch_size, *_EXPECTED_FEATURE_SHAPES["p2_projected"]),
+            )
+            start = index * _EXPECTED_FEATURE_SHAPES["p2_projected"][0]
+            stop = start + _EXPECTED_FEATURE_SHAPES["p2_projected"][0]
+            if p1.requires_grad or p2.requires_grad:
+                raise Pi05FeatureExtractionError(
+                    f"{key} PI0Pytorch features must be detached"
+                )
+            if (
+                p1.dtype != runtime.native_feature_dtype
+                or p2.dtype != runtime.native_feature_dtype
+            ):
+                raise Pi05FeatureExtractionError(
+                    f"{key} PI0Pytorch native feature dtype must be "
+                    f"{runtime.native_feature_dtype}, got P1={p1.dtype}, P2={p2.dtype}"
+                )
+            if not bool(torch.isfinite(p1).all()) or not bool(torch.isfinite(p2).all()):
+                raise Pi05FeatureExtractionError(
+                    f"{key} PI0Pytorch features contain non-finite values"
+                )
+            if not torch.equal(p2, prefix[:, start:stop]):
+                raise Pi05FeatureExtractionError(
+                    f"{key} P2 differs from its official embed_prefix token slice"
+                )
+    return captures[0], direct["base_0_rgb"]
 
 
 def _validate_batched_feature(
@@ -658,8 +637,8 @@ def _validate_batched_feature(
         )
 
 
-def _to_serialized_array(value: Any, runtime: _OpenPIRuntime) -> np.ndarray:
-    return np.asarray(runtime.jax.device_get(value), dtype=np.float32)
+def _to_serialized_array(value: Any) -> np.ndarray:
+    return value.detach().float().cpu().numpy()
 
 
 def _validate_serialized_arrays(arrays: dict[str, np.ndarray]) -> None:
@@ -700,8 +679,4 @@ def _save_feature_record(
         separators=(",", ":"),
     )
     with path.open("xb") as output:
-        np.savez_compressed(
-            output,
-            metadata_json=np.asarray(metadata_json),
-            **arrays,
-        )
+        np.savez_compressed(output, metadata_json=np.asarray(metadata_json), **arrays)

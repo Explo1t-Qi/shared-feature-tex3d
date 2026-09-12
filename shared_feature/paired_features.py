@@ -61,7 +61,7 @@ _PI05_SCHEMA = _ArchiveSchema(
     label="pi0.5",
     feature_shapes=_PI05_FEATURE_SHAPES,
     source_model="pi05",
-    feature_schema_version="pi05_features_v1",
+    feature_schema_version="pi05_torch_features_v1",
     checkpoint=_PI05_CHECKPOINT,
 )
 

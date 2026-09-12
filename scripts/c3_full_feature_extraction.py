@@ -17,43 +17,42 @@ from scripts import _full_feature_extraction_common as common  # noqa: E402
 
 CHECKPOINT_IDENTITY = "gs://openpi-assets/checkpoints/pi05_libero"
 CONFIG_NAME = "pi05_libero"
+EXTRACTION_IDENTITY = "pi05_libero:PI0Pytorch"
 DEFAULT_OPENPI_ROOT = PROJECT_ROOT.parent / "openpi"
+DEFAULT_CHECKPOINT_DIR = Path("/data/xiaomengqi/checkpoints/pi05_libero_pytorch")
 SPEC = common.FeatureSpec(
     model_family="pi05",
     source_model="pi05",
     checkpoint_identity=CHECKPOINT_IDENTITY,
-    feature_schema_version="pi05_features_v1",
+    feature_schema_version="pi05_torch_features_v1",
     manifest_filename="pi05_feature_manifest.json",
     nodes=(
         common.FeatureNode("P1", "p1_siglip", (256, 1152)),
         common.FeatureNode("P2", "p2_projected", (256, 2048)),
     ),
-    feature_config=CONFIG_NAME,
+    feature_config=EXTRACTION_IDENTITY,
 )
 
 
 @dataclass(frozen=True)
 class _Runtime:
     model: Any
-    train_config: Any
-    norm_stats: Any
+    policy: Any
     extractor: Callable[..., Sequence[Path]]
 
 
 @dataclass(frozen=True)
 class _OpenPIComponents:
-    jax: Any
-    jnp: Any
-    openpi_model: Any
-    download: Any
-    checkpoints: Any
+    torch: Any
+    model_type: Any
+    policy_config: Any
     config: Any
     extractor: Callable[..., Sequence[Path]]
 
 
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run formal Pilot v0.2 pi0.5 feature extraction."
+        description="Run Pilot v0.2 feature extraction with current PI0Pytorch."
     )
     parser.add_argument(
         "--collection-manifest",
@@ -65,13 +64,19 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--output-dir",
         type=Path,
         required=True,
-        help="Fresh or resumable formal C3 output directory.",
+        help="Fresh or resumable Phase 1 pi0.5 feature directory.",
     )
     parser.add_argument(
         "--openpi-root",
         type=Path,
         default=DEFAULT_OPENPI_ROOT,
-        help="Local OpenPI source repository used by the validated C3 path.",
+        help="OpenPI source repository containing the current PI0Pytorch code.",
+    )
+    parser.add_argument(
+        "--checkpoint-dir",
+        type=Path,
+        default=DEFAULT_CHECKPOINT_DIR,
+        help="Current pi05_libero PyTorch checkpoint directory.",
     )
     return parser.parse_args(argv)
 
@@ -93,42 +98,31 @@ def _validate_openpi_root(path: str | Path) -> Path:
     return openpi_root
 
 
-def _load_model(train_config: Any, checkpoint_path: Path, openpi_model: Any, jnp: Any):
-    safetensors_path = checkpoint_path / "model.safetensors"
-    if safetensors_path.is_file():
-        model = train_config.model.load_pytorch(
-            train_config,
-            str(safetensors_path),
-        )
-        model.paligemma_with_expert.to_bfloat16_for_selected_params("bfloat16")
-        return model, "pytorch"
-
-    params_path = checkpoint_path / "params"
-    if not params_path.is_dir():
+def _validate_checkpoint(path: str | Path) -> Path:
+    checkpoint = Path(path).expanduser().resolve()
+    if not (checkpoint / "model.safetensors").is_file():
         raise FileNotFoundError(
-            "pi0.5 checkpoint contains neither model.safetensors nor params"
+            f"PI0Pytorch model.safetensors not found under: {checkpoint}"
         )
-    params = openpi_model.restore_params(params_path, dtype=jnp.bfloat16)
-    return train_config.model.load(params), "jax_nnx"
+    if not (checkpoint / "assets").is_dir():
+        raise FileNotFoundError(
+            f"PI0Pytorch checkpoint assets not found under: {checkpoint}"
+        )
+    return checkpoint
 
 
-def _validate_runtime_precision(model: Any, backend: str, jax: Any) -> None:
-    try:
-        if backend == "jax_nnx":
-            from flax import nnx
-
-            leaves = jax.tree.leaves(nnx.state(model, nnx.Param))
-            parameter = next(
-                value
-                for leaf in leaves
-                if hasattr((value := getattr(leaf, "value", leaf)), "dtype")
-            )
-        else:
-            parameter = next(model.parameters())
-    except (AttributeError, StopIteration, TypeError) as error:
-        raise RuntimeError("cannot inspect pi0.5 model precision") from error
-    if str(parameter.dtype) not in {"bfloat16", "torch.bfloat16"}:
-        raise RuntimeError(f"pi0.5 model is not BF16: {parameter.dtype}")
+def _validate_train_config(train_config: Any) -> None:
+    model = getattr(train_config, "model", None)
+    if (
+        getattr(train_config, "name", None) != CONFIG_NAME
+        or model is None
+        or getattr(model, "pi05", None) is not True
+        or getattr(model, "action_horizon", None) != 10
+        or getattr(model, "action_dim", None) != 32
+        or getattr(model, "discrete_state_input", None) is not False
+        or getattr(model, "max_token_len", None) != 200
+    ):
+        raise RuntimeError("pi05_libero TrainConfig violates frozen semantics")
 
 
 def _load_openpi_components(openpi_root: Path) -> _OpenPIComponents:
@@ -142,55 +136,45 @@ def _load_openpi_components(openpi_root: Path) -> _OpenPIComponents:
         if source_string not in sys.path:
             sys.path.insert(0, source_string)
 
-    import jax
-    import jax.numpy as jnp
-    from openpi.models import model as openpi_model
-    from openpi.shared import download
-    from openpi.training import checkpoints, config
+    import torch
+    from openpi.models_pytorch.pi0_pytorch import PI0Pytorch
+    from openpi.policies import policy_config
+    from openpi.training import config
     from shared_feature import extract_pi05_features
 
     return _OpenPIComponents(
-        jax=jax,
-        jnp=jnp,
-        openpi_model=openpi_model,
-        download=download,
-        checkpoints=checkpoints,
+        torch=torch,
+        model_type=PI0Pytorch,
+        policy_config=policy_config,
         config=config,
         extractor=extract_pi05_features,
     )
 
 
-def _load_runtime(openpi_root: Path) -> _Runtime:
+def _load_runtime(openpi_root: Path, checkpoint: Path) -> _Runtime:
     components = _load_openpi_components(openpi_root)
-    if components.jax.default_backend() != "gpu":
-        raise RuntimeError(
-            "pi0.5 extraction requires JAX GPU backend, got "
-            f"{components.jax.default_backend()}"
-        )
+    if not components.torch.cuda.is_available():
+        raise RuntimeError("PI0Pytorch feature extraction requires a CUDA device")
     train_config = components.config.get_config(CONFIG_NAME)
-    checkpoint_path = components.download.maybe_download(CHECKPOINT_IDENTITY).resolve()
-    data_config = train_config.data.create(
-        train_config.assets_dirs,
-        train_config.model,
-    )
-    norm_stats = components.checkpoints.load_norm_stats(
-        checkpoint_path / "assets",
-        data_config.asset_id,
-    )
-    model, backend = _load_model(
+    _validate_train_config(train_config)
+    policy = components.policy_config.create_trained_policy(
         train_config,
-        checkpoint_path,
-        components.openpi_model,
-        components.jnp,
+        checkpoint,
+        pytorch_device="cuda",
     )
-    image_encoder = getattr(getattr(model, "PaliGemma", None), "img", None)
-    if not callable(image_encoder):
-        raise RuntimeError("pi0.5 model does not expose callable PaliGemma.img")
-    _validate_runtime_precision(model, backend, components.jax)
+    if getattr(policy, "_is_pytorch_model", None) is not True:
+        raise RuntimeError("current extraction did not load a PI0Pytorch policy")
+    model = getattr(policy, "_model", None)
+    if not isinstance(model, components.model_type):
+        raise RuntimeError("pi0.5 policy model is not the current PI0Pytorch class")
+    model.eval()
+    for parameter in model.parameters():
+        parameter.requires_grad_(False)
+    if model.training or any(parameter.requires_grad for parameter in model.parameters()):
+        raise RuntimeError("PI0Pytorch model was not frozen in eval mode")
     return _Runtime(
         model=model,
-        train_config=train_config,
-        norm_stats=norm_stats,
+        policy=policy,
         extractor=components.extractor,
     )
 
@@ -198,6 +182,7 @@ def _load_runtime(openpi_root: Path) -> _Runtime:
 def _run(args: argparse.Namespace) -> dict[str, Any]:
     source = common.load_source_collection(args.collection_manifest)
     openpi_root = _validate_openpi_root(args.openpi_root)
+    checkpoint = _validate_checkpoint(args.checkpoint_dir)
     preparation = common.prepare_output(
         output_dir=args.output_dir,
         source=source,
@@ -206,12 +191,11 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
 
     extracted_count = 0
     if preparation.missing_records:
-        runtime = _load_runtime(openpi_root)
+        runtime = _load_runtime(openpi_root, checkpoint)
         returned_paths = runtime.extractor(
             model=runtime.model,
-            train_config=runtime.train_config,
+            policy=runtime.policy,
             checkpoint=CHECKPOINT_IDENTITY,
-            norm_stats=runtime.norm_stats,
             observation_paths=tuple(
                 record.resolved_observation_path
                 for record in preparation.missing_records
@@ -234,12 +218,14 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
     manifest = common.build_feature_manifest(source=source, spec=SPEC)
     common.write_manifest_atomic(preparation.manifest_path, manifest)
     return {
-        "status": "C3 pi0.5 Full Feature Extraction — COMPLETE",
+        "status": "Phase 1 PI0Pytorch Feature Extraction — COMPLETE",
         "manifest_path": str(preparation.manifest_path),
         "num_feature_archives": len(feature_paths),
         "num_node_tensors": len(feature_paths) * len(SPEC.nodes),
         "reused_archives": preparation.reused_count,
         "extracted_archives": extracted_count,
+        "backend": "PI0Pytorch",
+        "checkpoint_path": str(checkpoint),
     }
 
 
