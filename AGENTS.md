@@ -1,5 +1,21 @@
 # AGENTS.md
 
+## Current Scientific Authority and Phase Status
+
+Read `/home/xmq/src/ground_truth_v1.md` first. It is the current authoritative
+scientific summary and supersedes historical route priorities in this file and in
+`docs/research-map.md` when they conflict.
+
+Phase 1 current-backend revalidation is complete. The formal result is
+`FORMAL COMPLETE / PASS`, and the current reusable O2/P2 mapping is
+`phase1_o2_p2_pi05_torch_v1`. Read `docs/phase1-pi05-torch-mapping.md` for the run
+identity, metrics, validation, artifact paths, and interpretation boundary. The
+historical `experiment_inbox/c5bm-formal-output/` artifact remains immutable
+JAX/NNX provenance and must not be used as the current PI0Pytorch mapping.
+
+Phase 2 shared-feature loss design, Tex3D optimization, and transfer evaluation
+have not started and require separate authorization.
+
 ## Current Authorized UP Pilot
 
 The bounded per-observation local-gradient positive control in
@@ -209,9 +225,9 @@ Paired cross-model features must preserve the same frozen raw observation identi
 
 Frozen statistical, sampling, grouping, split, CKA, SVCCA, and null-design decisions must not be replaced with alternatives without explicit scientific approval.
 
-### DECISION — Vulnerability-First Main Route
+### HISTORICAL DECISION — Vulnerability-First Main Route (Superseded)
 
-The current default scientific route is vulnerability-first:
+The repository previously used vulnerability-first as its default scientific route:
 
 1. independently identify model-specific adversarial/action-relevant vulnerable
    features within each VLA;
@@ -221,14 +237,14 @@ The current default scientific route is vulnerability-first:
    single-surrogate attack loss;
 4. evaluate transfer only on held-out VLA models.
 
-The previous clean-shared-first route (`clean CCA → action-relevant shared
-direction → attack`) is retained as complementary analysis, ablation, and a
-possible alternative route. It is deferred from the default main line, not rejected
-or classified as a failed route.
+This route priority and its single-surrogate-only restriction were superseded by
+the user-confirmed decisions recorded in `/home/xmq/src/ground_truth_v1.md`. The
+current priority is the shared-feature route. Both single-model and ensemble
+optimization remain research candidates; transfer claims must use target VLAs
+excluded from texture optimization.
 
 Multi-model clean/adversarial representation analysis is allowed during discovery.
-Future formal texture optimization must remain single-surrogate and must not become
-an ensemble objective such as `L_OpenVLA + L_pi0.5`.
+No Phase 2 loss or optimization configuration is frozen yet.
 
 Completed C5/C5-BM results remain evidence that heterogeneous VLA representations
 contain stable alignable clean shared structure. Completed C6 intervention closure
@@ -237,10 +253,14 @@ intervened and propagated downstream. Neither establishes vulnerable features,
 shared vulnerability, policy relevance, transferability, or a Tex3D attack.
 Maintain the boundary `shared != vulnerable != policy-relevant != transferable`.
 
-The next vulnerability-first cross-model feature study is `NOT YET CONTRACTED /
-NOT AUTHORIZED`. Do not implement vulnerability discovery, adversarial feature
-extraction, cross-model vulnerable-feature fusion, or any attack loss without a new
-explicit contract.
+The completed Phase 1 result additionally establishes that the same clean O2/P2
+alignment remains held-out-generalizing after refitting with the current
+PI0Pytorch P2 path. It does not change the boundary above.
+
+Phase 2 shared-feature loss design, vulnerability discovery, adversarial feature
+extraction, cross-model feature fusion, and attack optimization are `NOT YET
+CONTRACTED / NOT AUTHORIZED`. Do not implement them without a new explicit
+contract.
 
 ---
 
@@ -363,6 +383,18 @@ all `200 / 200` pairs, all four historical C5-B file identities remained unchang
 all nine mapping-array hashes verified, and all frozen historical scalar checks
 were reproduced with absolute difference `0.0`.
 
+This C5-BM artifact is the historical authoritative materialization for the
+JAX/NNX P2 path. For current PI0Pytorch work, use the Phase 1 mapping below.
+
+### DECISION / FACT — Phase 1 Current PI0Pytorch Mapping
+
+Phase 1 is `FORMAL COMPLETE / PASS`. It re-extracted all 200 P2 archives through
+the current `PI0Pytorch` path, revalidated paired identities, reran the frozen
+TRAIN-only 99%-PCA and ordinary linear CCA protocol, passed held-out evaluation,
+and transactionally published `phase1_o2_p2_pi05_torch_v1` with 262 canonical
+components. Its report is `docs/phase1-pi05-torch-mapping.md`; its synchronized
+artifact is under `experiment_inbox/shared-feature-phase1/`.
+
 ### DECISION / FACT — C6 Intervention-Interface and Real-Smoke Closure
 
 The O2/P2 intervention-interface contract is `FROZEN`. Its implementation is
@@ -420,8 +452,9 @@ The following scientific stages remain `NOT STARTED`:
 - transferability evaluation;
 - Tex3D optimization.
 
-Do not rerun or overwrite the completed formal C5-BM materialization, C6 real-smoke
-artifacts, or OpenVLA diagnostic artifacts without a new explicit contract. Do not
+Do not rerun or overwrite the historical C5-BM materialization, the current Phase 1
+mapping, C6 real-smoke artifacts, or OpenVLA diagnostic artifacts without a new
+explicit contract. Do not
 begin C6-B formal policy/action analysis, transferability evaluation, or Tex3D
 optimization without their required explicit authorization. Do not begin
 vulnerability discovery, adversarial feature extraction, or cross-model vulnerable

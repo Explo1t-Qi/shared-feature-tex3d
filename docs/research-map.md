@@ -1,13 +1,11 @@
 # Shared-Feature Tex3D Research Map
 
-> Latest completed bounded study: [实验 2：local gradient positive control](up-local-gradient-diagnostic.md)。
-> 前序 UP v1 真实模型运行完成，词汇 Top-10 未改变 decoded action tokens。
-> 前序 action screening 工程完成但候选不足，未形成冻结集合；实验 1 的逐帧 D
-> 复算也未找到跨组稳定候选。实验 2 已在原 12 帧完成：candidate / broader
-> 局部梯度能够稳定推动 D，但 native z 双向变化仅集中于一帧。结果支持局部
-> action-z logit 可控性，不支持 shared direction、稳定动作语义或迁移性。
-> 下一步是否构造 frozen direction 及其 train/test 拆分仍待讨论，尚未授权实现。
-> 以下 C5/C6 与默认研究路线记录保持历史语义；UP pilot 是新的独立协议。
+> Latest completed phase: [Phase 1 — current PI0Pytorch O2/P2 mapping](phase1-pi05-torch-mapping.md)，状态为 `FORMAL COMPLETE / PASS`。
+> 新的 `phase1_o2_p2_pi05_torch_v1` mapping 是当前 PI0Pytorch 后端的
+> authoritative reusable mapping；历史 C5-BM 仅保留为 JAX/NNX P2 provenance。
+> Phase 1 未设计 Tex3D shared-feature loss，也未运行 texture optimization 或
+> transfer evaluation。当前科学方向与优先级以 `/home/xmq/src/ground_truth_v1.md`
+> 为准；下文较早的 vulnerability-first 路线记录仅作历史 provenance。
 
 ## 1. Research Goal
 
@@ -17,11 +15,11 @@
 
 当前核心假设是：
 
-> 不同 VLA 架构不仅可能存在稳定的 clean shared representation structure，也可能
-> 存在跨模型共同的 adversarially vulnerable / action-relevant structure。本项目优先
-> 在各模型内部独立识别真正容易被攻击且与动作相关的 features/directions，再研究这些
-> vulnerable structures 能否在异构 VLA 之间对齐或融合，最终用于提高
-> single-surrogate adversarial texture 的迁移性。
+> 不同 VLA 架构中已验证的 clean shared representation structure 可能提供比原生
+> 单模型 features 更具跨架构泛化性的攻击信号。Phase 1 已冻结当前 PI0Pytorch
+> O2↔P2 mapping；下一阶段需要直接检验该 shared/aligned space 能否改进 Tex3D
+> texture transfer。Single-model 与 ensemble optimization 均保留为候选，最终迁移性
+> 必须在未参与 texture optimization 的 VLA 上评估。
 
 必须严格区分：
 
@@ -42,7 +40,7 @@
 
 ## 2. Threat Model
 
-### DECISION — Vulnerable-Feature Discovery + Single-Surrogate Attack
+### CURRENT DECISION — Shared-Feature Route; Attack Configuration Open
 
 Representation discovery 阶段允许同时分析多个 VLA，例如：
 
@@ -52,10 +50,12 @@ Representation discovery 阶段允许同时分析多个 VLA，例如：
 允许使用多个模型的 clean/adversarial representations 做 discovery、对齐和融合分析，
 包括使用 paired clean representations 分析 shared structure。
 
-但是正式 adversarial texture optimization 必须保持：
+Phase 2 尚未冻结正式 adversarial texture optimization 配置。允许研究：
 
 ```text
-single surrogate only
+single-model optimization
+or
+multi-model / ensemble optimization
 ```
 
 例如以 OpenVLA 为 surrogate：
@@ -70,18 +70,8 @@ Z^{\mathrm{vuln}}_A(x_{\mathrm{adv}})
 \theta_{\mathrm{texture}}.
 \]
 
-该式只冻结 single-surrogate boundary；具体 vulnerable representation 和 loss 尚未
-contracted 或 authorized。
-
-攻击阶段不得退化为：
-
-\[
-\mathcal{L}_{\mathrm{OpenVLA}}
-+
-\mathcal{L}_{\pi_{0.5}}
-\]
-
-这样的 multi-model ensemble attack。
+具体 shared-feature representation、loss、模型组合和优化协议尚未 contracted 或
+authorized，不应在 Phase 1 文档中提前冻结。
 
 Held-out VLA 只用于迁移性评估，不参与 attack-time loss、gradient 或 texture optimization。
 
@@ -270,6 +260,9 @@ C6-A policy-sensitivity interface closure   COMPLETE / FROZEN
 C5-BM scientific/engineering contract       FROZEN
 C5-BM implementation                        UNIT-LEVEL PASS
 C5-BM formal materialization                FORMAL COMPLETE / PASS
+Phase 1 current PI0Pytorch P2 extraction    FORMAL COMPLETE / PASS
+Phase 1 current O2/P2 PCA+CCA validation    FORMAL COMPLETE / PASS
+Phase 1 current authoritative mapping       FROZEN / PASS
 C6 intervention-interface contract         FINAL AUDIT PASS / FROZEN
 C6 intervention-interface implementation   UNIT-LEVEL PASS
 C6 intervention-interface unit validation  PASS
@@ -280,10 +273,11 @@ C6 original intervention smoke              PARTIAL / HISTORICAL BLOCKED
 C6 OpenVLA token/logit diagnostic           PASS
 C6 intervention-interface closure           COMPLETE
 Previous C6-B clean-shared-direction plan   DEFERRED / COMPLEMENTARY / NOT AUTHORIZED
-Vulnerability-first cross-model study       NEXT / NOT CONTRACTED / NOT AUTHORIZED
+Vulnerability-first cross-model study       COMPLEMENTARY / NOT CONTRACTED
 Final overall research gate                OPEN / NOT DEFINED HERE
 Policy/action relevance                    NOT STARTED
 Transferability / Tex3D optimization       NOT STARTED / NOT AUTHORIZED
+Phase 2 shared-feature loss / optimization NOT STARTED / NOT AUTHORIZED
 ```
 
 C1 已完成 real OpenVLA/LIBERO smoke。
@@ -336,6 +330,15 @@ read-only audit 并冻结；它定义新的 authoritative mapping materializatio
 恢复历史未保存矩阵。其 implementation 已通过 unit-level validation，formal
 materialization 已完成并通过全部验证，结果为 `PASS`。
 
+Phase 1 随后使用当前 `PI0Pytorch` 路径重新提取全部 `200 / 200` 个 P2，保持原有
+sample/token ordering、group-aware split、TRAIN-only 99%-PCA、ordinary linear CCA、
+HELD-OUT-without-refit 与 null semantics。正式结果为 `PASS`：O2/P2 保留维度分别为
+`1793 / 262`，HELD-OUT Top5Mean 为 `0.970537564615`，null median 为
+`0.941040551584`，经验 `p = 0.00497512437811`。新的
+`phase1_o2_p2_pi05_torch_v1` mapping 已冻结；详见
+`docs/phase1-pi05-torch-mapping.md`。历史 JAX/NNX C5-BM 仍保持 byte-identical，
+但不再作为当前 PI0Pytorch backend mapping。
+
 C6 O2/P2 intervention interface 已在真实 checkpoint 上完成验证。OpenVLA 与
 pi0.5 的 clean-equivalence 均为 `2 / 2 PASS`。原始 intervention smoke 结果必须
 保留为：OpenVLA 在冻结的 translation-response gate 下为 `BLOCKED`，pi0.5 为
@@ -347,10 +350,10 @@ decoded translation 保持不变。该结果支持 discrete argmax/token-boundar
 
 这些 C5/C6 结果现在定位为两类既有基础证据：异构 VLA representations 中存在稳定、
 可对齐的 clean shared structure；native O2/P2 features 可被显式介入并传播到
-downstream computation。它们不直接证明 vulnerability 或 transferability。下一默认
-主线是尚未 contracted/authorized 的 vulnerability-first cross-model feature study；
-原 C6-B clean-shared-direction 计划保留为 complementary analysis / ablation，而非
-失败路线。
+downstream computation。它们不直接证明 vulnerability 或 transferability。Phase 1
+进一步确认该 shared space 在当前 PI0Pytorch 后端仍成立。下一默认主线是尚未
+contracted/authorized 的 Phase 2 shared-feature loss 与 Tex3D 验证；mechanistic 和
+vulnerability-first 路线保留为 secondary/complementary analysis。
 
 ---
 
@@ -1199,6 +1202,22 @@ C5-BM implementation 为 `UNIT-LEVEL PASS`，formal materialization 已完成并
 C5-BM 也不定义 native intervention vector、token scope、epsilon、C6-B sensitivity
 metric 或 Tex3D loss。
 
+### RESULT — Phase 1 Current PI0Pytorch Mapping Closure
+
+Phase 1 已于 2026-09-12 正式完成并达到 `FORMAL COMPLETE / PASS`。运行使用
+shared-feature-tex3d commit `a67b51c1f09021e9ae057276f384ff73e3a2546e`、OpenPI
+commit `15a9616a00943ada6c20a0f158e3adb39df2ccac` 和 `pi05_libero` checkpoint
+SHA-256 `feeedaf6abe1601f8fb24041e21ae8c022b91141ebf1616678cfd2ea8640a09e`。
+
+当前 authoritative mapping 的 materialization ID 为
+`phase1_o2_p2_pi05_torch_v1`，同步目录为
+`experiment_inbox/shared-feature-phase1/phase1-o2-p2-pi05-torch-v1/mapping/`。
+`mapping.npz` SHA-256 为
+`572d4772432025f130ecf0403562bab20a20d4bec008c778985b2b9aee28caec`。
+
+该结果只关闭当前后端 O2↔P2 clean shared-space 的重验证和 mapping 冻结，不构成
+shared vulnerability、policy/action relevance、Tex3D attack 或 transferability 证据。
+
 ### DECISION / FACT — C6 O2/P2 Intervention-Interface and Real-Smoke Closure
 
 C6 O2/P2 intervention-interface contract 已冻结。Implementation 已达到
@@ -1329,6 +1348,10 @@ C5-BM implementation — UNIT-LEVEL PASS
         ↓
 C5-BM formal materialization — FORMAL COMPLETE / PASS
         ↓
+Phase 1 current PI0Pytorch O2/P2 refit — FORMAL COMPLETE / PASS
+        ↓
+Phase 1 mapping phase1_o2_p2_pi05_torch_v1 — FROZEN / PASS
+        ↓
 O2/P2 intervention-interface contract — FINAL AUDIT PASS / FROZEN
         ↓
 O2/P2 intervention-interface implementation — UNIT-LEVEL PASS
@@ -1343,19 +1366,13 @@ C6 OpenVLA token/logit diagnostic — PASS
         ↓
 C6 intervention-interface feasibility / closure — COMPLETE
         ↓
-model-specific vulnerability discovery — NEXT / NOT CONTRACTED / NOT AUTHORIZED
+Phase 2 shared-feature loss design — NEXT / NOT CONTRACTED / NOT AUTHORIZED
         ↓
-action-relevant vulnerable feature identification
-        ↓
-cross-model vulnerable feature alignment / fusion
-        ↓
-shared vulnerable representation
-        ↓
-single-surrogate vulnerable-feature Tex3D loss
+single-model and ensemble configurations remain candidates
         ↓
 Tex3D texture optimization
         ↓
-held-out cross-VLA transfer evaluation
+held-out VLA transfer evaluation on models excluded from optimization
 ```
 
 第一个 stage gate——C5-A geometry-stage gate——已经正式执行：
@@ -1374,11 +1391,10 @@ OpenVLA 与 pi0.5 上达到 `2 / 2 PASS`；原始 intervention smoke 保留 Open
 closure 达到 `COMPLETE`。这仍不是 policy/action relevance PASS。最终 overall
 research gate 仍为 `OPEN / NOT DEFINED HERE`。
 
-该图在 C6 closure 后展示的是新的 vulnerability-first 默认路线。原
-clean-shared-first 路线（clean CCA → action-relevant shared direction → attack）
-仍完整保留为 complementary analysis / ablation / possible alternative route，不是
-失败路线。C5-A、C5-B 与 C5-BM 的历史 pipeline 和结果仍是 clean shared structure
-稳定且可对齐的正式证据。
+该图的当前出口是 Phase 2 shared-feature route。Mechanistic 与 vulnerability-first
+路线仍完整保留为 secondary/complementary analysis，不是失败路线。C5-A、C5-B、
+历史 C5-BM 与当前 Phase 1 mapping 共同构成 clean shared structure 稳定且可对齐的
+正式证据。
 
 如果 C5-A NO-GO，应停止并重新评估当前 frozen geometry hypothesis；不得静默
 更换 C5-A metric、split、null 或 threshold。无论 C5-A 结果如何，都不能将其
